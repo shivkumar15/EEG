@@ -18,3 +18,5 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+# CHB-MIT raw dataset (keep local; do not commit)
+EEG_Seizure_Detection_Phase1/dataset/chbmit/
