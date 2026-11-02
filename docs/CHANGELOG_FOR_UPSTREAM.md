@@ -63,14 +63,25 @@ Behavior:
 
 Verification in the working checkout: **35 unit tests passed**.
 
-## Phase 0, Task 6 — root Git ignore and dataset policy
+## Phase 0, Task 6 — root Git ignore and dataset policy — VERIFIED
 
-File added:
-- Repository-root `.gitignore` (commit `e5c27c0`).
+Files/commits:
+- Repository-root `.gitignore`: commit `e5c27c0` added the general ignore rules.
+- Commit `abfd931` removed the already-tracked CHB-MIT dataset from the current Git tree and added the dataset-specific root ignore rule.
 
-It excludes Python virtual environments (including `.venv311`), Python caches, generated logs, IDE folders and OS metadata.
+Verified outcome:
+- 10 EDF recordings and 3 subject summary files were removed from Git tracking.
+- Local dataset files were preserved; the user verified `chb01_03.edf` still exists.
+- `git check-ignore` confirmed the dataset path is ignored.
+- The working tree was clean after the push.
+- These files remain present in earlier Git history; no history rewrite was performed.
 
-Important: the 10 existing EDF files are already tracked in the working repository. The root/nested ignore rules do not remove already tracked files. Current provisional policy is to preserve these 10 files, add no further raw EDFs, and avoid deleting/untracking them during synchronization. Final dataset provenance/license and long-term storage policy remains to be decided and documented.
+Dataset provenance and policy:
+- Source: CHB-MIT Scalp EEG Database, PhysioNet version 1.0.0, DOI `10.13026/C2K01R`.
+- PhysioNet lists the Open Data Commons Attribution License (ODC-By) v1.0 for this database.
+- The license covers database rights; it does not automatically resolve separate rights in individual contents. This record is not a blanket legal opinion about every recording.
+- Do not copy raw EDFs or subject summary files to the original team repository. Each team member should obtain the dataset from PhysioNet and retain the source/version/license information.
+- Include the required ODC-By attribution/license notice if publicly conveying the database or a derivative database; include a source/license notice when publicly using produced works, as specified by the license. Cite the PhysioNet dataset page in reports and project documentation.
 
 ## Phase 0, Task 7 — verified preprocessing results (current working subset)
 
@@ -102,7 +113,15 @@ After Phase 0 is fully complete:
    ```
 7. Report the actual test count and EDF inventory. Do not claim upstream synchronization/verification until the user confirms the push and test output.
 
-## Still pending before upstream synchronization
-- Finalize raw EDF provenance/license and storage policy.
-- Correct README dataset path/setup examples to match the actual layout.
-- Complete Task 8 final Phase 0 validation.
+## Current synchronization status
+
+The working repository has completed the local Phase 0 code, dataset-policy, README, test-suite, and dataset-inspection checks. Latest user-confirmed working-repository verification:
+- 35 unit tests passed.
+- `python main.py --inspect` found 10 EDFs.
+- Git working tree clean after commit `abfd931`.
+- Local dataset retained and ignored by Git.
+
+Still pending:
+- Back up and inspect the original repository before replacing/mirroring its code folder.
+- Synchronize the verified code and documentation without copying raw EDFs, subject summaries, virtual environments, or generated outputs.
+- Run the unit tests and `python main.py --inspect` in the original repository and record the user's actual output.
