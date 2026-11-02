@@ -53,14 +53,15 @@ Record verified actions only. Planned work is not marked complete.
 - All 10 inspected recordings had 256 Hz sampling and the same 17 selected channels. No resampling was needed for this inspected subset.
 - The selected montage did not include `T8-P8` because that channel was not present under the expected name in these files; the actual selected channel list was consistent across the 10 files.
 
-### Task 6: Git ignore scope and raw EDF storage — PARTIALLY COMPLETE
-- Added a repository-root `.gitignore` to exclude virtual environments, Python caches, generated logs, IDE files and OS metadata.
-- Commit `e5c27c0` was pushed to `shivkumar15/EEG`.
-- User verified `.venv311/` and Python cache directories are ignored.
-- Removed the temporary local `verify_annotations.py`.
-- The 10 existing EDF files are already tracked by Git. The nested project `.gitignore` does not untrack existing files.
-- Provisional handling: preserve the 10 existing tracked EDFs for now, do not add further raw EDFs, and do not delete/untrack them during this phase.
-- A final dataset provenance/license and long-term distribution decision remains to be documented. Do not mark Task 6 fully complete until that decision is recorded.
+### Task 6: Git ignore scope and raw EDF storage — VERIFIED
+- Added a repository-root `.gitignore` to exclude virtual environments, Python caches, generated logs, IDE files, OS metadata, and the local CHB-MIT dataset directory.
+- Commit `e5c27c0` added the root ignore rules; commit `abfd931` removed the already-tracked dataset files from the Git index and pushed the removal to `shivkumar15/EEG`.
+- The removal commit staged and removed 10 EDF recordings and 3 matching subject summary files from the current Git tree. The files remain on the user's computer; `Test-Path` returned `True` for `chb01_03.edf`.
+- `git check-ignore` confirmed that the raw EDF path is ignored. The user also verified a clean working tree after the push.
+- Do not copy raw EDF files or subject summary files into the original team repository. Team members should obtain the dataset independently from the official PhysioNet source and retain the source/version/license notice.
+- Dataset provenance verified from the official PhysioNet CHB-MIT v1.0.0 page: DOI `10.13026/C2K01R`; license listed as Open Data Commons Attribution License (ODC-By) v1.0. The ODC-By license governs database rights and expressly does not automatically clear separate rights in individual contents. Do not treat the database license as a blanket legal conclusion about every individual recording.
+- For public redistribution of the database or a derivative database, comply with the ODC-By notice/license requirements. For public use of produced works, include the required source/license notice. Project policy is to keep raw recordings out of Git and cite PhysioNet in project documentation and public outputs.
+- The ten EDFs and three summary files are no longer tracked in the current Git tree, but remain in earlier Git history. No history rewrite was performed.
 
 ### Task 7: Clean preprocessing verification — VERIFIED FOR THE CURRENT 10-EDF SUBSET
 - User inspected all 10 EDF headers and annotation summaries. Each had 256 Hz sampling, 23 raw channels, and 17 selected channels. Nine recordings were 3,600 seconds and `chb01_26.edf` was 2,325 seconds.
@@ -92,16 +93,17 @@ Record verified actions only. Planned work is not marked complete.
 - This is an academic seizure-detection prototype, not a medical device or diagnostic system.
 
 ## Task 8 — Final Phase 0 validation
-Pending:
-1. Finalize the raw EDF provenance/license and storage policy.
-2. Update README dataset paths and setup instructions where they do not match the actual sibling-folder layout.
-3. Run the full 35-test suite and inspect generated outputs after documentation/configuration changes.
-4. Synchronize the verified code folder and documentation to the original team repository, preserving its dataset and excluding virtual environments/generated outputs.
-5. Run tests and `python main.py --inspect` in the original repository. Do not claim upstream completion until the user confirms the results.
+- [x] Dataset provenance and storage policy documented using the official PhysioNet CHB-MIT v1.0.0 page and ODC-By v1.0 license information.
+- [x] README dataset paths, environment setup, repository links, and documentation links corrected to match the verified layout.
+- [x] User reran the full unit test suite: **35 tests passed, 0 failures**.
+- [x] User reran `python main.py --inspect`: 10 EDF recordings found (CHB01: 8; CHB02: 1; CHB03: 1).
+- [x] Removed 10 EDF files and 3 subject summary files from current Git tracking while preserving local files; verified ignore behavior and clean working tree.
+- [ ] Synchronize the verified code folder and documentation to the original team repository, preserving its dataset and excluding virtual environments/generated outputs.
+- [ ] Run tests and `python main.py --inspect` in the original repository. Do not claim upstream completion until the user confirms the results.
 
 ## Current phase
-**Phase 0 — Tasks 1–5 and 7 verified; Task 6 partially complete; Task 8 pending.**
+**Phase 0 — Tasks 1–7 verified; Task 8 final synchronization and original-repository verification pending.**
 
 ## Next actions
-- Complete the remaining Task 6 dataset provenance/storage decision and Task 8 final checks.
-- Do not begin model training until Phase 0 is complete and the cohort/split design is explicitly defined.
+- Prepare and review the original repository backup and synchronization diff.
+- Do not begin model training until the original repository has been synchronized and verified, and the cohort/split design is explicitly defined.
