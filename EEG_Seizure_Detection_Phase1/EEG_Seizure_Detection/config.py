@@ -1,7 +1,15 @@
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DATASET_DIR = PROJECT_ROOT.parent / "dataset" / "chbmit"
+
+# Use an external dataset path when configured.
+# Otherwise, preserve the existing project-relative fallback.
+_default_dataset_dir = PROJECT_ROOT.parent / "dataset" / "chbmit"
+DATASET_DIR = Path(
+    os.environ.get("EEG_DATASET_DIR", str(_default_dataset_dir))
+).expanduser().resolve()
+
 PROCESSED_DIR = PROJECT_ROOT / "processed"
 LOG_DIR = PROJECT_ROOT / "logs"
 
