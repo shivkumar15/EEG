@@ -50,7 +50,7 @@ class PatientValidationSplitTests(unittest.TestCase):
     def test_different_seed_can_change_validation_patients(self):
         recordings = self._recordings()
         first = build_patient_validation_split(recordings, random_state=1)
-        second = build_patient_validation_split(recordings, random_state=2)
+        second = build_patient_validation_split(recordings, random_state=17)
         self.assertNotEqual(first.validation_patient_ids, second.validation_patient_ids)
 
     def test_validation_fraction_uses_ceiling(self):
