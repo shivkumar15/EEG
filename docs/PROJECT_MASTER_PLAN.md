@@ -72,9 +72,9 @@ Add SHAP or another justified method only after model selection and evaluation a
 - [x] Add tests for annotation parsing and edge cases.
 - [x] Validate channel matching, filtering, segmentation and normalization behavior for the current subset.
 - [x] Reproduce CHB01 processing counts from a clean processed-output run.
-- [ ] Finalize raw EDF provenance/license and storage/distribution policy.
-- [ ] Correct README dataset path and setup examples to match actual folder layout.
-- [ ] Complete final clean-checkout and original-repository verification.
+- [x] Finalize raw EDF provenance/license and storage/distribution policy; keep raw EDFs out of Git and preserve local copies.
+- [x] Correct README dataset path, repository links, documentation links, and setup examples to match the verified folder layout.
+- [ ] Synchronize to the original repository and complete its clean-checkout/test verification.
 
 ### Phase 1 — multi-subject preparation
 - [ ] Expand and document a justified subject/recording cohort.
@@ -125,13 +125,21 @@ Add SHAP or another justified method only after model selection and evaluation a
 - [ ] Prepare report, presentation, diagrams and demo.
 - [ ] Document dataset provenance, ethics, limits and contributions.
 
+## Dataset provenance and distribution policy
+- Source: [CHB-MIT Scalp EEG Database, PhysioNet v1.0.0](https://physionet.org/content/chbmit/1.0.0/).
+- DOI: `10.13026/C2K01R`.
+- PhysioNet lists the [Open Data Commons Attribution License v1.0 (ODC-By)](https://physionet.org/content/chbmit/view-license/1.0.0/).
+- ODC-By governs rights in the database; the license text says it does not automatically cover separate rights in individual contents. This project records the dataset's stated database license but does not make a blanket legal determination about every recording.
+- Raw EDFs and subject summary files are excluded from the current Git tree. Local copies remain available to the developer, and the root `.gitignore` prevents accidental recommit.
+- Do not copy raw EDFs or summary files into the original team repository. Team members should download the dataset from PhysioNet independently and preserve attribution/license notices.
+- If the database or a derivative database is publicly conveyed, follow ODC-By notice and license requirements. If produced works are publicly used, include the source/license notice required by the license. Cite PhysioNet in reports and project documentation.
+- Commit `abfd931` removed 10 EDFs and 3 summary files from current Git tracking. Earlier Git history still contains the prior versions; no history rewrite was performed.
+
 ## Remaining audit items
-1. Raw EDF binaries are already tracked in the working repository. Preserve the existing 10 files for now; do not add further EDFs or remove/untrack them until the dataset provenance/license and storage policy is explicitly decided.
-2. README dataset path examples must reflect that `dataset` is a sibling of `EEG_Seizure_Detection` under `EEG_Seizure_Detection_Phase1`.
-3. The active `main.py --all` loop catches per-file exceptions and prints `SKIPPED`; future larger-cohort runs must record and audit skips explicitly.
-4. The selected montage's `T8-P8` channel was not present under the expected name in the inspected recordings; the 17 selected channels were otherwise consistent.
-5. Channel ranking exists as a helper and must be integrated only inside training folds, never globally before splitting.
-6. The original `student-anshu/EEG-seizure-detection` repository remains untouched until synchronization and verification are explicitly completed.
+1. The active `main.py --all` loop catches per-file exceptions and prints `SKIPPED`; future larger-cohort runs must record and audit skips explicitly.
+2. The selected montage's `T8-P8` channel was not present under the expected name in the inspected recordings; the 17 selected channels were otherwise consistent.
+3. Channel ranking exists as a helper and must be integrated only inside training folds, never globally before splitting.
+4. The original `student-anshu/EEG-seizure-detection` repository remains untouched until synchronization and verification are explicitly completed.
 
 ## Upstream synchronization policy
 Develop and test in `shivkumar15/EEG` first. Once Phase 0 is complete, back up the original code folder, copy the verified code folder, preserve the original dataset, and exclude virtual environments and generated outputs. Review the diff, commit/push to the original repository, then run the complete tests and `python main.py --inspect` there. Never claim the original repository was updated until confirmed.
