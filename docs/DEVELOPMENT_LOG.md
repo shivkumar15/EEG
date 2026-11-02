@@ -22,3 +22,14 @@ Record verified actions only. Planned work is not marked complete.
 
 ## Reported but unverified
 A previous progress report stated 8 CHB01 EDFs and 5,497 windows (5,397 normal, 100 seizure), 17 channels, 256 Hz, 10-second windows and 5-second stride. These are not independently reproduced in this repository yet.
+
+
+## 2026-11-02 — Phase 0, Task 1: annotation parser correction
+- Updated `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/preprocessing/annotations.py` to support numbered and unnumbered CHB-MIT seizure time labels.
+- Parser checks the declared seizure count, rejects missing/mismatched annotations, rejects negative or non-positive intervals, returns an empty list only for recordings explicitly declaring zero seizures, and errors when the EDF is absent from the summary.
+- Added `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/tests/test_annotations.py` with six unit tests for supported formats and failure cases.
+- Verified the parser's core regular expression matches both numbered and unnumbered start-time labels in an isolated check. Full unit test suite and direct CHB01/CHB03 integration run have NOT yet been executed because this GitHub-connected session does not run code inside the repository checkout.
+- No EDF, dataset, model, or other preprocessing source files were changed.
+
+### Next verification
+Run the unit test command from the `EEG_Seizure_Detection` directory and then run a parser-only check against CHB01 and CHB03 summary files before proceeding to dataset-path correction.
