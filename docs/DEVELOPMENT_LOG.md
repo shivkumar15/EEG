@@ -43,5 +43,10 @@ Command: `python verify_annotations.py`
 
 The temporary `verify_annotations.py` is a local verification script and is not part of the committed implementation unless separately added. No EDF, dataset, model, or other preprocessing source files were changed.
 
+## 2026-11-02 — Phase 0, Task 2: dataset path correction (implementation added; local verification pending)
+- Updated `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/config.py`: `DATASET_DIR` now resolves as `PROJECT_ROOT.parent / "dataset" / "chbmit"`, matching the repository layout where `dataset` is a sibling of `EEG_Seizure_Detection`.
+- Added `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/tests/test_config_paths.py` with two tests for the expected sibling path and directory relationship.
+- These tests and `python main.py --inspect` still need to be run in the user's local checkout. Do not mark Task 2 verified until the user shares successful output.
+
 ## Next task
-Phase 0, Task 2: inspect and correct dataset path resolution, then test the resolved path against the actual repository layout. Do not begin model training yet.
+After Task 2 verification, review import/package execution conventions and then validate the single-EDF preprocessing path. Do not begin model training yet.
