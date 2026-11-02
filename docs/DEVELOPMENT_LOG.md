@@ -15,9 +15,9 @@ Record verified actions only. Planned work is not marked complete.
 **Phase 0 — audit and correctness.**
 
 ## Next actions
-1. Correct dataset path resolution and import/package execution conventions.
-2. Add path tests and verify the complete preprocessing entry point.
-3. Verify preprocessing outputs and reproduce previously reported counts before treating them as results.
+1. Audit segmentation, channel handling and EDF metadata consistency.
+2. Validate one EDF end-to-end before processing the full cohort.
+3. Reproduce processed-window counts and label distributions; do not treat previously reported counts as results until reproduced.
 
 ## Reported but unverified
 A previous progress report stated 8 CHB01 EDFs and 5,497 windows (5,397 normal, 100 seizure), 17 channels, 256 Hz, 10-second windows and 5-second stride. These are not independently reproduced in this repository yet.
@@ -53,3 +53,28 @@ The temporary `verify_annotations.py` is a local verification script and is not 
 
 ## Next task
 Review import/package execution conventions and then validate the single-EDF preprocessing path. Do not begin model training yet.
+
+
+## 2026-11-02 — Phase 0, Task 3: import/execution convention — VERIFIED
+- Updated `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/check_processed_data.py` to import `PROCESSED_DIR` using `from config import PROCESSED_DIR`, consistent with the script-style execution convention used by `main.py`.
+- User ran `python -m unittest discover -s tests -v`: **8 tests passed**.
+- User ran `python check_processed_data.py`: completed successfully and reported zero processed recordings/windows, which is expected because no processed dataset had yet been generated.
+- User ran `python main.py --inspect`: **10 EDF files found**.
+- No package restructuring was performed; scripts continue to be run from the `EEG_Seizure_Detection` directory.
+
+## 2026-11-02 — Phase 0, Task 4: signal-processing hardening — VERIFIED
+### Changes
+- Updated `preprocessing/signal_processing.py` with validation for 2D non-empty EEG arrays, finite values, valid sampling frequency and cutoff parameters.
+- Kept the existing fourth-order Butterworth bandpass configuration and the default 0.5–40 Hz passband, with the upper edge capped below Nyquist.
+- Changed notch filtering to second-order-section forward-backward filtering for numerical stability; the notch is skipped when disabled or at/above Nyquist.
+- Added explicit errors for recordings too short for forward-backward filtering.
+- Retained per-channel median/IQR normalization and documented that its statistics are computed over the entire supplied recording (offline, non-causal behavior).
+- Added `tests/test_signal_processing.py` with 10 tests covering filter behavior, notch attenuation/skip behavior, invalid inputs, normalization, and constant channels.
+
+### Verified by user on the local Windows checkout
+- `python -m unittest discover -s tests -v` — **18 tests passed, 0 failures** (8 existing + 10 new).
+- `python main.py --inspect` — **10 EDF files found**.
+- A navigation command attempted to enter a nested project path while already inside the project directory; it failed harmlessly. Tests and inspection were then run successfully from the correct directory.
+
+### Methodology note
+- The current normalization is an offline per-recording transform. It must not be described as causal real-time normalization. A causal or training-fitted transform will need a separate design if real-time inference or a different evaluation protocol is selected.
