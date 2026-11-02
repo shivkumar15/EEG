@@ -17,7 +17,7 @@ def is_officially_unannotated_recording(edf_path: str | Path) -> bool:
     summary_path = find_summary_file(edf_path)
     summary_text = summary_path.read_text(encoding="utf-8", errors="ignore")
     if re.search(
-        rf"^File Name\\s*:\\s*{re.escape(edf_path.name)}\\s*$",
+        rf"^File Name\s*:\s*{re.escape(edf_path.name)}\s*$",
         summary_text,
         flags=re.IGNORECASE | re.MULTILINE,
     ):
@@ -31,12 +31,12 @@ def is_officially_unannotated_recording(edf_path: str | Path) -> bool:
 
     relative_path = edf_path.relative_to(dataset_root).as_posix()
     records = {
-        line.strip().replace("\\", "/")
+        line.strip().replace("\", "/")
         for line in records_path.read_text(encoding="utf-8", errors="ignore").splitlines()
         if line.strip()
     }
     seizure_records = {
-        line.strip().replace("\\", "/")
+        line.strip().replace("\", "/")
         for line in seizure_records_path.read_text(encoding="utf-8", errors="ignore").splitlines()
         if line.strip()
     }
@@ -48,20 +48,20 @@ def read_seizure_intervals(edf_path: str | Path) -> list[tuple[float, float]]:
     edf_path = Path(edf_path)
     summary_path = find_summary_file(edf_path)
     text = summary_path.read_text(encoding="utf-8", errors="ignore")
-    blocks = re.split(r"(?=^File Name\\s*:)", text, flags=re.IGNORECASE | re.MULTILINE)
+    blocks = re.split(r"(?=^File Name\s*:)", text, flags=re.IGNORECASE | re.MULTILINE)
 
     for block in blocks:
-        name = re.search(r"^File Name\\s*:\\s*(.*?)\\s*$", block,
+        name = re.search(r"^File Name\s*:\s*(.*?)\s*$", block,
                          flags=re.IGNORECASE | re.MULTILINE)
         if not name or name.group(1).lower() != edf_path.name.lower():
             continue
 
-        count = re.search(r"^Number of Seizures in File\\s*:\\s*(\\d+)\\s*$",
+        count = re.search(r"^Number of Seizures in File\s*:\s*(\d+)\s*$",
                           block, flags=re.IGNORECASE | re.MULTILINE)
         if not count:
             raise ValueError(f"Missing seizure count for {edf_path.name}")
         expected = int(count.group(1))
-        pattern = r"^Seizure(?:\\s+\\d+)?\\s+{0}\\s+Time\\s*:\\s*(\\d+(?:\\.\\d+)?)\\s*seconds?\\s*$"
+        pattern = r"^Seizure(?:\s+\d+)?\s+{0}\s+Time\s*:\s*(\d+(?:\.\d+)?)\s*seconds?\s*$"
         starts = re.findall(pattern.format("Start"), block, flags=re.IGNORECASE | re.MULTILINE)
         ends = re.findall(pattern.format("End"), block, flags=re.IGNORECASE | re.MULTILINE)
 
