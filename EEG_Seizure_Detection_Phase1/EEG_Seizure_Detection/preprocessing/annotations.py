@@ -14,6 +14,15 @@ def find_summary_file(edf_path: str | Path) -> Path:
 def is_officially_unannotated_recording(edf_path: str | Path) -> bool:
     """Confirm an unlisted EDF is negative using both official CHB-MIT manifests."""
     edf_path = Path(edf_path)
+    summary_path = find_summary_file(edf_path)
+    summary_text = summary_path.read_text(encoding="utf-8", errors="ignore")
+    if re.search(
+        rf"^File Name\\s*:\\s*{re.escape(edf_path.name)}\\s*$",
+        summary_text,
+        flags=re.IGNORECASE | re.MULTILINE,
+    ):
+        return False
+
     dataset_root = edf_path.parent.parent
     records_path = dataset_root / "RECORDS"
     seizure_records_path = dataset_root / "RECORDS-WITH-SEIZURES"
