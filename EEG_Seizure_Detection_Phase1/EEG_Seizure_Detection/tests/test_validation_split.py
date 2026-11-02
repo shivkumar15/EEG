@@ -14,7 +14,10 @@ class PatientValidationSplitTests(unittest.TestCase):
             helper._row("chb21", "chb21_01.edf", 1),
             helper._row("chb02", "chb02_01.edf", 1),
             helper._row("chb02", "chb02_02.edf"),
-            helper._row("chb03", "chb03_01.edf", 2),
+            {
+                **helper._row("chb03", "chb03_01.edf", 2),
+                "seizure_intervals_seconds": "100-120; 200-220",
+            },
             helper._row("chb04", "chb04_01.edf", 1),
             helper._row("chb05", "chb05_01.edf", 1),
         ]
