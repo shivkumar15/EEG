@@ -98,7 +98,7 @@ def main() -> int:
         writer.writeheader()
         writer.writerows(rows)
 
-    print("\\n========== FULL ANNOTATION AUDIT ==========")
+    print("\n========== FULL ANNOTATION AUDIT ==========")
     print(f"EDF recordings discovered: {len(edf_files)}")
     print(f"Successfully parsed: {successful}")
     print(f"Failed: {failed}")
@@ -108,12 +108,12 @@ def main() -> int:
     print(f"CSV report: {report_path}")
 
     if failed_rows:
-        print("\\nFailed recordings (up to 30):")
+        print("\nFailed recordings (up to 30):")
         for row in failed_rows[:30]:
             print(f"- {row['relative_path']}: {row['error']}")
         return 1
 
-    print("\\nAll discovered EDF annotations were parsed successfully.")
+    print("\nAll discovered EDF annotations were parsed successfully.")
     return 0
 
 
