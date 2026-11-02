@@ -11,11 +11,10 @@ An academic EEG seizure-detection project using the CHB-MIT Scalp EEG Database. 
 
 ## Project Documentation
 
-1. [Project Master Plan](EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/docs/PROJECT_MASTER_PLAN.md)
-2. [AI / Teammate Handoff](EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/docs/AI_HANDOFF.md)
-3. [Development Log](EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/docs/DEVELOPMENT_LOG.md)
-4. [Upstream Change Log](EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/docs/CHANGELOG_FOR_UPSTREAM.md)
-
+1. [Project Master Plan](docs/PROJECT_MASTER_PLAN.md)
+2. [AI / Teammate Handoff](docs/AI_HANDOFF.md)
+3. [Development Log](docs/DEVELOPMENT_LOG.md)
+4. [Upstream Change Log](docs/CHANGELOG_FOR_UPSTREAM.md)
 
 
 ## 1. Project Structure
@@ -39,9 +38,9 @@ EEG/
 │       ├── preprocessing/
 │       ├── feature_selection/
 │       ├── tests/
-│       ├── docs/
 │       └── processed/                # Generated locally
 │
+├── docs/                            # Project plans and development records
 └── .gitignore
 ```
 
