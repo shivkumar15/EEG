@@ -28,3 +28,22 @@ Copy these five documentation paths/files to the original repository. There is n
 - Correct `.gitignore` scope and decide raw EDF storage policy.
 
 For each later implementation fix, append exact paths, behavior before/after, test command/results and an upstream-ready patch. Do not mark upstream changes complete until confirmed by the user or verified from an upstream commit.
+
+
+## 2026-11-02 — Phase 0, Task 1: annotation parser correction
+
+### Files changed in working copy
+- Updated `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/preprocessing/annotations.py`.
+- Added `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/tests/test_annotations.py`.
+
+### Behavior change
+- Supports unnumbered CHB-MIT fields (`Seizure Start Time`, `Seizure End Time`) and numbered variants.
+- Verifies annotation count against `Number of Seizures in File`.
+- Returns `[]` for an explicitly zero-seizure recording.
+- Raises clear errors for missing/mismatched annotations, invalid intervals, missing summary files and EDF files not listed in the summary.
+
+### Tests
+Six unit tests were added. Full test execution and direct CHB01/CHB03 integration verification remain pending; do not mark the parser fully validated until those commands pass.
+
+### Mirror to original repository
+Copy both changed files from this working repository to the exact same relative paths in `student-anshu/EEG-seizure-detection`. No other source files or dataset files need to be copied for this task. After copying, run the same unit tests in the original repository.
