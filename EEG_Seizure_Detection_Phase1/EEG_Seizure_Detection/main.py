@@ -40,7 +40,7 @@ def choose_channels(raw):
 
 def process_edf(edf_path: str | Path):
     edf_path = Path(edf_path)
-    print(f"\\nLoading: {edf_path}")
+    print(f"\nLoading: {edf_path}")
     raw = load_edf(edf_path)
     channels = choose_channels(raw)
     raw.pick(channels)
@@ -104,7 +104,8 @@ def _processed_recording_is_valid(recording, processed_dir: Path) -> bool:
             f"{recording.subject}_{Path(recording.edf_file).stem}_metadata.csv"
         )
         return _metadata_is_consistent(recording, metadata_path, windows)
-    except (FileNotFoundError, ValueError, OSError, KeyError):
+    except Exception:
+        # Any unreadable, corrupt, or incompatible artifact must be regenerated.
         return False
 
 
@@ -194,7 +195,7 @@ def prepare_primary_cohort(
         )
 
     print(
-        "\\nCohort preprocessing summary: "
+        "\nCohort preprocessing summary: "
         f"processed={counts['processed']}, "
         f"skipped_valid={counts['skipped_valid']}, failed={counts['failed']}"
     )
@@ -204,7 +205,7 @@ def prepare_primary_cohort(
 
 def inspect_dataset():
     if not DATASET_DIR.exists():
-        raise FileNotFoundError(f"Dataset folder not found: {DATASET_DIR}\\nDownload and extract CHB-MIT into dataset/chbmit.")
+        raise FileNotFoundError(f"Dataset folder not found: {DATASET_DIR}\nDownload and extract CHB-MIT into dataset/chbmit.")
     edfs = sorted(DATASET_DIR.rglob("*.edf"))
     print(f"Dataset directory: {DATASET_DIR}")
     print(f"EDF files found: {len(edfs)}")
@@ -251,7 +252,7 @@ def main():
             except Exception as exc:
                 skipped += 1
                 print(f"SKIPPED {path}: {exc}")
-        print(f"\\nDataset processing finished: processed={processed}, skipped={skipped}")
+        print(f"\nDataset processing finished: processed={processed}, skipped={skipped}")
 
 
 if __name__ == "__main__":
