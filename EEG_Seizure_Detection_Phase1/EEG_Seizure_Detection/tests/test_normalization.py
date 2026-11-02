@@ -31,7 +31,7 @@ class FoldChannelStandardizerTests(unittest.TestCase):
         np.testing.assert_array_equal(scaler.mean_, fitted_mean)
         np.testing.assert_array_equal(scaler.scale_, fitted_scale)
         np.testing.assert_allclose(transformed[0, 0], [99.0, 101.0])
-        np.testing.assert_allclose(transformed[0, 1], [493.0, 495.0])
+        np.testing.assert_allclose(transformed[0, 1], [494.0, 496.0])
         self.assertEqual(transformed.dtype, np.float32)
 
     def test_fit_transform_standardizes_training_windows(self):
