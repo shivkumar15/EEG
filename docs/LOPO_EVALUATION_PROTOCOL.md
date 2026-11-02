@@ -62,6 +62,34 @@ If a validation set is needed, it must be created with a patient-grouped
 split inside the outer training set. The held-out outer test patient must not
 influence model selection or preprocessing.
 
+## Inner patient-grouped validation
+
+For each outer LOPO fold, the inner validation split is built only from that
+fold's 22 outer-training patients. The outer test patient is never passed to
+the validation splitter.
+
+The current implementation uses a deterministic patient-grouped holdout:
+
+- Validation fraction: 20% of the outer-training patients.
+- Selection: seeded shuffle with random state 42.
+- Rounding: ceiling, so each fold holds out 5 of its 22 training patients.
+- All recordings from a patient stay together.
+- The remaining 17 patients are used for model fitting.
+- Train, validation, and outer test patient IDs are pairwise disjoint.
+
+The current audit contains seizure events for all 23 independent patients.
+The inspection script checks that both inner training and validation contain
+annotated seizure events in every outer fold. The split is a reproducible
+holdout for model development; it is not an additional independent test set.
+Do not use outer test metrics to select hyperparameters, thresholds, epochs,
+or preprocessing settings.
+
+Run the inner split inspection from the project code directory:
+
+```powershell
+python .\scripts\inspect_nested_validation.py
+```
+
 ## Run the split inspection
 
 From the project code directory, after pulling the implementation:
