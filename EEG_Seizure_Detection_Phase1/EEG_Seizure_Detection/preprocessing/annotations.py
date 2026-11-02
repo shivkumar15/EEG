@@ -31,12 +31,12 @@ def is_officially_unannotated_recording(edf_path: str | Path) -> bool:
 
     relative_path = edf_path.relative_to(dataset_root).as_posix()
     records = {
-        line.strip().replace("\", "/")
+        line.strip()
         for line in records_path.read_text(encoding="utf-8", errors="ignore").splitlines()
         if line.strip()
     }
     seizure_records = {
-        line.strip().replace("\", "/")
+        line.strip()
         for line in seizure_records_path.read_text(encoding="utf-8", errors="ignore").splitlines()
         if line.strip()
     }
