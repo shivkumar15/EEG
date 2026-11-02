@@ -33,7 +33,6 @@ class SavedWindowsIntegrationTests(unittest.TestCase):
                 patch.object(main, "load_edf", return_value=FakeRaw()),
                 patch.object(main, "read_seizure_intervals", return_value=[(12, 14)]),
                 patch.object(main, "bandpass_and_notch", side_effect=lambda data, *args: data),
-                patch.object(main, "robust_normalize", side_effect=lambda data: data),
                 patch.object(main, "PROCESSED_DIR", output_dir),
             ):
                 saved_path = main.process_edf(edf_path)
@@ -55,6 +54,7 @@ class SavedWindowsIntegrationTests(unittest.TestCase):
                 self.assertEqual(float(saved["sfreq"]), 1.0)
                 self.assertEqual(str(saved["subject"]), "chb01")
                 self.assertEqual(str(saved["source_file"]), "chb01_03.edf")
+                self.assertEqual(str(saved["normalization"]), "none_fold_train_only_scaling_required")
 
             metadata_path = output_dir / "chb01_chb01_03_metadata.csv"
             self.assertTrue(metadata_path.exists())
@@ -65,6 +65,7 @@ class SavedWindowsIntegrationTests(unittest.TestCase):
                 metadata["window_end_seconds"], starts + main.WINDOW_SECONDS
             )
             np.testing.assert_array_equal(metadata["label"], labels)
+            self.assertTrue((metadata["normalization"] == "none_fold_train_only_scaling_required").all())
 
 
 if __name__ == "__main__":
