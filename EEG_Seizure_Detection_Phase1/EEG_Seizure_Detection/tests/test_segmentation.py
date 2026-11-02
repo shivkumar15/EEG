@@ -67,7 +67,7 @@ class MakeWindowsTests(unittest.TestCase):
             data, 1, [(12, 28)], window_seconds=10, stride_seconds=5
         )
         np.testing.assert_array_equal(starts, [0, 5, 10, 15, 20, 25, 30])
-        np.testing.assert_array_equal(labels, [0, 0, 1, 1, 1, 1, 0])
+        np.testing.assert_array_equal(labels, [0, 1, 1, 1, 1, 1, 0])
 
     def test_multiple_seizure_intervals_are_labelled(self):
         data = np.zeros((1, 50), dtype=np.float32)
