@@ -56,3 +56,24 @@ Then run `python -m unittest discover -s tests -v` from the original repository'
 - Normalize import/package execution conventions.
 - Add tests and validate preprocessing, channel handling and normalization.
 - Correct `.gitignore` scope and decide raw EDF storage policy.
+
+
+## Phase 0, Task 2: dataset path correction
+
+### Files changed in working copy
+- Updated `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/config.py`.
+- Added `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/tests/test_config_paths.py`.
+
+### Behavior change
+- `DATASET_DIR` now resolves to `PROJECT_ROOT.parent / "dataset" / "chbmit"`, matching the actual layout where `dataset` and `EEG_Seizure_Detection` are sibling directories.
+
+### Verification status
+Implementation and two path tests are committed in the working repository. Local test execution and `python main.py --inspect` are **pending user verification**.
+
+### Mirror to original repository
+Copy both files to the same relative paths in `student-anshu/EEG-seizure-detection`. Then, from the original repository's `EEG_Seizure_Detection` directory, run:
+```powershell
+python -m unittest discover -s tests -v
+python main.py --inspect
+```
+Do not mark the upstream copy complete until verified.
