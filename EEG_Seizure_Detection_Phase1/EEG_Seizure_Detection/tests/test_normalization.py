@@ -75,5 +75,20 @@ class FoldChannelStandardizerTests(unittest.TestCase):
             scaler.fit(invalid)
 
 
+    def test_streaming_batches_match_single_array_statistics(self):
+        first = np.array([[[1.0, 3.0], [10.0, 14.0]]])
+        second = np.array([[[5.0, 7.0], [18.0, 22.0]]])
+        combined = np.concatenate([first, second], axis=0)
+        one_shot = FoldChannelStandardizer().fit(combined)
+        streamed = FoldChannelStandardizer().fit_batches([first, second])
+        np.testing.assert_allclose(streamed.mean_, one_shot.mean_)
+        np.testing.assert_allclose(streamed.scale_, one_shot.scale_)
+        self.assertEqual(streamed.n_values_per_channel_, 4)
+
+    def test_streaming_fit_rejects_empty_batches(self):
+        with self.assertRaisesRegex(ValueError, "no training windows"):
+            FoldChannelStandardizer().fit_batches([])
+
+
 if __name__ == "__main__":
     unittest.main()
