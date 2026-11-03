@@ -10,20 +10,22 @@ Active repository: https://github.com/shivkumar15/EEG
 - Patient-wise evaluation: 23 LOPO folds; every eligible recording tested once; patient leakage checks passed.
 - Nested validation: 17 fit patients, 5 validation patients, 1 outer test patient per fold.
 - Fold-wise standardization is fitted on inner-fit patients only.
-- Latest local regression suite after feature extraction: 95 tests passed, 0 failures.
+- Feature extraction source and its 10 focused tests are pushed to GitHub main:
+  - `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/feature_selection/feature_extraction.py`
+  - `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/tests/test_feature_extraction.py`
+- Full regression suite rerun by the user after GitHub synchronization: **95 tests passed, 0 failures** (0.470 seconds).
 
 ## In progress — Phase 4, Milestone 4.1
-Feature extraction is implemented locally in `feature_selection/feature_extraction.py`, with 13 features per channel: seven time-domain/statistical features, five EEG band powers, and spectral entropy. Ten focused tests were added in `tests/test_feature_extraction.py`.
+Feature extraction implements 13 features per channel: mean, standard deviation, variance, RMS, line length, skewness, excess kurtosis, five EEG band powers, and spectral entropy. Ten focused unit tests cover shape, dtype, finite values, invalid inputs and constant signals.
 
-**Important GitHub sync status:** the latest feature extraction source and tests are local work and have not yet been confirmed on GitHub main. The 95-test result is also a local user-reported result, not a CI result.
+**Important:** Passing unit tests confirms implementation behavior for the tested cases; it does not yet establish scientific correctness of frequency-band estimates.
 
 ## Next steps
-1. User pushes the feature extraction source and tests.
-2. Verify the exact files on GitHub and rerun the full test suite.
-3. Run synthetic frequency-band validation for delta, theta, alpha, beta and gamma.
-4. Review Welch frequency resolution and band-edge integration.
-5. Integrate feature extraction into the fold-wise data pipeline.
-6. Train and evaluate SVM and Random Forest baselines using the nested patient-wise splits.
+1. Create and run `scripts/validate_frequency_features.py` using synthetic 2, 6, 10, 20 and 35 Hz signals.
+2. Verify expected delta, theta, alpha, beta and gamma band dominance.
+3. Review Welch frequency resolution and band-edge integration; adjust only if validation supports a change.
+4. Integrate validated feature extraction into the fold-wise pipeline.
+5. Train SVM and Random Forest baselines using nested patient-wise splits.
 
 ## Not started
 - Classical baseline model training and final metrics.
