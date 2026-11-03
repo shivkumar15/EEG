@@ -7,6 +7,10 @@ recordings from the outer test patient with training data.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
+from pathlib import Path
+import re
 from typing import Iterable, Sequence
 
 import numpy as np
@@ -53,16 +57,44 @@ def fit_channel_standardizer(
     return scaler.fit_batches(batches())
 
 
+def _feature_cache_signature(recordings, channel_scaler) -> str:
+    """Fingerprint all inputs that determine the extracted feature values."""
+    if channel_scaler.mean_ is None or channel_scaler.scale_ is None:
+        raise RuntimeError("Channel scaler must be fitted before feature extraction")
+    digest = hashlib.sha256()
+    digest.update(b"eeg-feature-cache-v1")
+    digest.update(np.asarray(channel_scaler.mean_, dtype=np.float64).tobytes())
+    digest.update(np.asarray(channel_scaler.scale_, dtype=np.float64).tobytes())
+    digest.update(json.dumps({
+        "epsilon": channel_scaler.epsilon,
+        "channels": list(PREFERRED_CHANNELS),
+        "features": list(FEATURE_NAMES),
+        "recordings": [
+            {"relative_path": item.relative_path, "patient_id": item.patient_id,
+             "seizure_count": item.seizure_count}
+            for item in recordings
+        ],
+    }, sort_keys=True).encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _write_cache_manifest(path: Path, payload: dict) -> None:
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    temporary.replace(path)
+
+
 def collect_features(
     recordings: Sequence[Recording], processed_dir,
     channel_scaler: FoldChannelStandardizer,
+    cache_dir: Path | None = None,
+    cache_key: str = "features",
 ) -> FeatureBatch:
-    """Extract features into one preallocated matrix, one recording at a time.
+    """Extract features with optional per-recording disk checkpoints.
 
-    A label-only first pass determines the output size without decompressing
-    EEG arrays. The second pass loads one recording, extracts its features,
-    copies them into the final matrix, and releases the recording before the
-    next one. Per-window recording path strings are intentionally not stored.
+    Cached X/y arrays are .npy memory maps. The manifest advances atomically
+    only after both arrays are flushed, so an interrupted recording is safely
+    recomputed on resume. Cache identity includes scaler and cohort metadata.
     """
     from data_management.fold_data import processed_path_for_recording
 
@@ -71,6 +103,7 @@ def collect_features(
 
     total_windows = 0
     labels_by_recording = []
+    processed_paths = []
     for recording in recordings:
         path = processed_path_for_recording(processed_dir, recording)
         if not path.is_file():
@@ -87,16 +120,68 @@ def collect_features(
         if bool(np.any(labels == 1)) != (recording.seizure_count > 0):
             raise ValueError(f"{path.name} labels disagree with the audit manifest")
         labels_by_recording.append(labels)
+        processed_paths.append(path)
         total_windows += len(labels)
 
     feature_count = len(PREFERRED_CHANNELS) * len(FEATURE_NAMES)
-    X = np.empty((total_windows, feature_count), dtype=np.float32)
-    y = np.empty(total_windows, dtype=np.int8)
+    cache_path = None
+    manifest_path = None
+    X = y = None
     cursor = 0
+    completed_recordings = 0
 
-    for index, (recording, expected_y) in enumerate(
-        zip(recordings, labels_by_recording), start=1
+    if cache_dir is not None:
+        cache_root = Path(cache_dir)
+        safe_key = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(cache_key)).strip("._") or "features"
+        signature = _feature_cache_signature(recordings, channel_scaler)
+        cache_path = cache_root / f"{safe_key}-{signature[:20]}"
+        cache_path.mkdir(parents=True, exist_ok=True)
+        manifest_path = cache_path / "manifest.json"
+        x_path, y_path = cache_path / "X.npy", cache_path / "y.npy"
+        expected_shape = (total_windows, feature_count)
+
+        if manifest_path.is_file() and x_path.is_file() and y_path.is_file():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if (manifest.get("signature") == signature
+                    and manifest.get("shape") == list(expected_shape)
+                    and manifest.get("dtype") == "float32"
+                    and manifest.get("label_dtype") == "int8"):
+                    candidate_x = np.load(x_path, mmap_mode="r+", allow_pickle=False)
+                    candidate_y = np.load(y_path, mmap_mode="r+", allow_pickle=False)
+                    completed = int(manifest.get("completed_recordings", 0))
+                    saved_cursor = int(manifest.get("cursor", 0))
+                    expected_cursor = sum(len(labels_by_recording[i]) for i in range(completed))
+                    if (candidate_x.shape == expected_shape and candidate_x.dtype == np.float32
+                        and candidate_y.shape == (total_windows,) and candidate_y.dtype == np.int8
+                        and 0 <= completed <= len(recordings) and saved_cursor == expected_cursor):
+                        X, y = candidate_x, candidate_y
+                        completed_recordings, cursor = completed, saved_cursor
+            except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+                X = y = None
+
+        if X is None:
+            for stale in (x_path, y_path, manifest_path):
+                if stale.exists():
+                    stale.unlink()
+            X = np.lib.format.open_memmap(x_path, mode="w+", dtype=np.float32, shape=expected_shape)
+            y = np.lib.format.open_memmap(y_path, mode="w+", dtype=np.int8, shape=(total_windows,))
+            _write_cache_manifest(manifest_path, {
+                "signature": signature, "shape": list(expected_shape),
+                "dtype": "float32", "label_dtype": "int8",
+                "completed_recordings": 0, "cursor": 0, "complete": False,
+            })
+        else:
+            print(f"    resuming feature cache: {completed_recordings}/{len(recordings)} recordings", flush=True)
+    else:
+        X = np.empty((total_windows, feature_count), dtype=np.float32)
+        y = np.empty(total_windows, dtype=np.int8)
+
+    for index, (recording, expected_y, path) in enumerate(
+        zip(recordings, labels_by_recording, processed_paths), start=1
     ):
+        if index <= completed_recordings:
+            continue
         item = load_recording_windows(processed_dir, recording)
         if not np.array_equal(item.y, expected_y):
             raise RuntimeError(
@@ -107,8 +192,7 @@ def collect_features(
         expected_shape = (len(item.y), feature_count)
         if features.shape != expected_shape or features.dtype != np.float32:
             raise RuntimeError(
-                f"Invalid feature matrix for {recording.relative_path}: "
-                f"{features.shape}, {features.dtype}"
+                f"Invalid feature matrix for {recording.relative_path}: {features.shape}, {features.dtype}"
             )
         if not np.isfinite(features).all():
             raise RuntimeError(f"Non-finite features for {recording.relative_path}")
@@ -116,15 +200,28 @@ def collect_features(
         X[cursor:next_cursor] = features
         y[cursor:next_cursor] = item.y
         cursor = next_cursor
-        if index % 25 == 0 or index == len(recordings):
-            print(
-                f"    feature extraction: {index}/{len(recordings)} recordings",
-                flush=True,
-            )
         del item, standardized, features
+
+        if cache_path is not None:
+            X.flush()
+            y.flush()
+            _write_cache_manifest(manifest_path, {
+                "signature": signature, "shape": list(X.shape),
+                "dtype": "float32", "label_dtype": "int8",
+                "completed_recordings": index, "cursor": cursor,
+                "complete": index == len(recordings),
+            })
+        if index % 25 == 0 or index == len(recordings):
+            print(f"    feature extraction: {index}/{len(recordings)} recordings", flush=True)
 
     if cursor != total_windows or not np.isin(y, (0, 1)).all():
         raise RuntimeError("Collected features and binary labels are inconsistent")
+    if cache_path is not None:
+        X.flush()
+        y.flush()
+        del X, y
+        X = np.load(cache_path / "X.npy", mmap_mode="r", allow_pickle=False)
+        y = np.load(cache_path / "y.npy", mmap_mode="r", allow_pickle=False)
     return FeatureBatch(X, y, ())
 
 
