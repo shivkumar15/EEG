@@ -166,6 +166,11 @@ def collect_features(
                 X = y = None
 
         if X is None:
+            # Close partially opened mappings before replacing files (Windows compatibility).
+            if "candidate_x" in locals():
+                del candidate_x
+            if "candidate_y" in locals():
+                del candidate_y
             for stale in (x_path, y_path, manifest_path):
                 if stale.exists():
                     stale.unlink()
