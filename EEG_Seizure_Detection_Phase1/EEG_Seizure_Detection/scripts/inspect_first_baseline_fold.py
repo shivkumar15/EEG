@@ -24,7 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from config import PROCESSED_DIR
 from data_management.cohort import filter_primary_cohort
 from data_management.dataset_split import build_lopo_folds
-from data_management.fold_data import load_recording_windows
+from data_management.fold_data import processed_path_for_recording
 from data_management.patient_mapping import load_recording_manifest
 from data_management.validation_split import build_patient_validation_split
 
@@ -33,12 +33,33 @@ BYTES_PER_FEATURE = np.dtype(np.float32).itemsize
 
 
 def inspect_group(name, recordings, processed_dir):
+    """Count labels without loading/decompressing the large EEG signal array."""
     counts = Counter()
     total_windows = 0
-    for recording in recordings:
-        item = load_recording_windows(processed_dir, recording)
-        counts.update(int(value) for value in item.y)
-        total_windows += len(item.y)
+    total = len(recordings)
+    print(f"  Inspecting {name}: {total} recordings (labels only)...", flush=True)
+
+    for index, recording in enumerate(recordings, start=1):
+        path = processed_path_for_recording(processed_dir, recording)
+        if not path.is_file():
+            raise FileNotFoundError(f"Processed windows missing: {path}")
+
+        # NPZ members are loaded lazily. Accessing y avoids loading the much
+        # larger X array, which is unnecessary for a label-count preflight.
+        with np.load(path, allow_pickle=False) as saved:
+            if "y" not in saved.files:
+                raise ValueError(f"{path.name} is missing the y array.")
+            y = np.asarray(saved["y"])
+
+        if y.ndim != 1 or len(y) == 0 or not np.isin(y, [0, 1]).all():
+            raise ValueError(f"{path.name} has empty or non-binary labels.")
+        if bool(np.any(y == 1)) != (recording.seizure_count > 0):
+            raise ValueError(f"{path.name} labels disagree with audited seizure annotations.")
+
+        counts.update(int(value) for value in y)
+        total_windows += len(y)
+        if index % 25 == 0 or index == total:
+            print(f"    {index}/{total} recordings inspected", flush=True)
 
     normal = counts.get(0, 0)
     seizure = counts.get(1, 0)
