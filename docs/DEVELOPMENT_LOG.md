@@ -54,8 +54,18 @@ Current milestone: **4.1 — feature extraction and scientific validation**.
 - **Synthetic pure-tone validation: 5/5 passed** — 2 Hz correctly dominant in delta, 6 Hz in theta, 10 Hz in alpha, 20 Hz in beta, and 35 Hz in gamma.
 - This confirms expected band dominance for clean in-band pure tones at 256 Hz. It does not validate noisy/mixed EEG, boundary frequencies, or clinical performance.
 
+#### Extended synthetic robustness validation — completed diagnostic run
+- Added `scripts/validate_frequency_robustness.py`; user pulled commit `bc3324b` and ran it locally.
+- Ten near-boundary tones (0.75, 3.5, 4.5, 7.5, 8.5, 12.5, 13.5, 29.5, 30.5, 39.5 Hz) produced sensible dominant-band results. At several midpoints, adjacent bands had nearly equal power, as expected from finite resolution and spectral leakage.
+- Mixed 2 Hz + 10 Hz test passed: delta and alpha components were both represented.
+- Noisy 10 Hz test passed: alpha remained dominant after Gaussian noise (standard deviation 0.3; seed 42), with finite powers.
+- Welch comparison: 1-second segments provide 1 Hz resolution; 2-second segments provide 0.5 Hz resolution.
+- For the diagnostic mixed 2 Hz + 10 Hz signal, delta power was 0.4166667 using the existing 1-second bin-only integration and 0.4895833 with interpolated band edges. At 2-second Welch, both methods gave 0.5 for this test.
+- These are synthetic diagnostics only and do not establish performance on real EEG.
+
 #### Still pending in milestone 4.1
-- Extend validation to frequencies near band boundaries and noisy/mixed signals.
+- Evaluate a candidate 2-second Welch + interpolated band-edge implementation on synthetic noisy/mixed and boundary signals.
+- Add regression tests for the revised spectral calculation.
 - Review Welch frequency resolution and band-edge integration before freezing feature definitions.
 - Fold-standardized input changes the scale of absolute band-power features; do not describe these as calibrated physical EEG power in microvolt-squared units.
 - Integrate feature extraction into the fold-wise data pipeline only after scientific checks pass.
