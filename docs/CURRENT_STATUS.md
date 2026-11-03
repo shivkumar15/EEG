@@ -14,6 +14,7 @@ Active repository: https://github.com/shivkumar15/EEG
   - `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/feature_selection/feature_extraction.py`
   - `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/tests/test_feature_extraction.py`
 - Full regression suite rerun by the user after GitHub synchronization: **95 tests passed, 0 failures** (0.470 seconds).
+- Synthetic pure-tone validation: **5/5 passed** (2 Hz delta, 6 Hz theta, 10 Hz alpha, 20 Hz beta, 35 Hz gamma); each tone's expected band had the highest extracted power.
 
 ## In progress — Phase 4, Milestone 4.1
 Feature extraction implements 13 features per channel: mean, standard deviation, variance, RMS, line length, skewness, excess kurtosis, five EEG band powers, and spectral entropy. Ten focused unit tests cover shape, dtype, finite values, invalid inputs and constant signals.
@@ -21,11 +22,10 @@ Feature extraction implements 13 features per channel: mean, standard deviation,
 **Important:** Passing unit tests confirms implementation behavior for the tested cases; it does not yet establish scientific correctness of frequency-band estimates.
 
 ## Next steps
-1. Create and run `scripts/validate_frequency_features.py` using synthetic 2, 6, 10, 20 and 35 Hz signals.
-2. Verify expected delta, theta, alpha, beta and gamma band dominance.
-3. Review Welch frequency resolution and band-edge integration; adjust only if validation supports a change.
-4. Integrate validated feature extraction into the fold-wise pipeline.
-5. Train SVM and Random Forest baselines using nested patient-wise splits.
+1. Extend synthetic validation to frequencies near band edges and noisy/mixed signals.
+2. Review Welch frequency resolution and band-edge integration; adjust only if validation supports a change.
+3. Integrate validated feature extraction into the fold-wise pipeline.
+4. Train SVM and Random Forest baselines using nested patient-wise splits.
 
 ## Not started
 - Classical baseline model training and final metrics.
