@@ -70,3 +70,9 @@ No random window-level train/test split. Fit all preprocessing, feature selectio
 - User-reported local verification: focused baseline tests 5/5 passed; complete regression suite 103/103 passed, 0 failures, in 0.446 seconds.
 - These tests verify software utilities only. No real-EEG baseline training or seizure-detection performance metrics have been produced.
 - Next: implement a controlled first-LOPO-fold runner, inspect class counts and memory, and settle the threshold/refit protocol before any outer-test evaluation. Reusing a threshold after refitting a model can change score calibration; this must not be assumed valid.
+
+
+## First baseline fold preflight
+- Added `scripts/inspect_first_baseline_fold.py` (commit `50448b10aa324d2d0b2f4d2bf0d3b34ab06799ec`).
+- The script loads the audited primary cohort, constructs the first outer LOPO fold and deterministic inner patient split, counts normal/seizure windows per split, and estimates float32 feature-matrix memory at 221 columns.
+- It does not extract features, fit models, or evaluate outer-test performance. Run it from the EEG_Seizure_Detection project directory with `python .\\scripts\\inspect_first_baseline_fold.py`.
