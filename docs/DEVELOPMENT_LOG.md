@@ -103,3 +103,19 @@ Current milestone: **4.1 — feature extraction and scientific validation**.
 - Channel ranking must be performed inside the training fold only.
 - Report window-level and event-level evaluation separately.
 - This is an academic research prototype, not a medical device or diagnostic tool.
+
+
+### 2026-11-03 — Milestone 4.2: fold-wise feature integration VERIFIED LOCALLY
+- Added `RecordingFeatures` and `PreparedFold.iter_features(split)` in `data_management/fold_data.py`.
+- The iterator builds on `iter_split()`: each recording is loaded, transformed using the standardizer fitted on inner-fit patients, and then passed to deterministic feature extraction.
+- It streams one recording at a time and yields the feature matrix together with the recording identity, labels, window start timestamps and sampling frequency.
+- Expected matrix shape is `(n_windows, 221)`: 17 configured channels × 13 features per channel. Matrices are checked for float32 dtype and finite values.
+- Integration tests cover fit/validation/test split iteration, 221-column feature shape, finite float32 values, label/timestamp alignment, and retention of recording identity.
+- GitHub main commits: implementation `5100a3cbc08d44c3c437f23f49229549abc5ecaf`; tests `372afa09b362c165b9b79c7a394815f6f246175a`.
+- User pulled main successfully. Focused command `python -m unittest discover -s tests -p "test_fold_data.py" -v`: **5 tests passed, 0 failures** in 0.521 seconds.
+- Full command `python -m unittest discover -s tests -v`: **98 tests passed, 0 failures** in 0.874 seconds.
+- These are user-reported local test results. They verify software behavior on the test fixtures, not seizure-detection performance on real EEG.
+
+#### Next milestone
+- Review and freeze feature definitions, then implement the baseline training/evaluation workflow using the patient-wise nested folds and recording-at-a-time feature iterator.
+- Do not randomly split overlapping windows. Hyperparameter selection must remain inside inner fit/validation patients; outer-test patients are reserved for final fold evaluation.
