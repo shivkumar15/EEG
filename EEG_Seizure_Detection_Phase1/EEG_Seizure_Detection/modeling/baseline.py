@@ -57,7 +57,7 @@ def fit_channel_standardizer(
     return scaler.fit_batches(batches())
 
 
-def _feature_cache_signature(recordings, channel_scaler) -> str:
+def _feature_cache_signature(recordings, channel_scaler, processed_paths) -> str:
     """Fingerprint all inputs that determine the extracted feature values."""
     if channel_scaler.mean_ is None or channel_scaler.scale_ is None:
         raise RuntimeError("Channel scaler must be fitted before feature extraction")
@@ -66,6 +66,11 @@ def _feature_cache_signature(recordings, channel_scaler) -> str:
     digest.update(np.asarray(channel_scaler.mean_, dtype=np.float64).tobytes())
     digest.update(np.asarray(channel_scaler.scale_, dtype=np.float64).tobytes())
     digest.update(json.dumps({
+        "cache_version": 1,
+        "processed_sources": [
+            {"path": str(path), "size": path.stat().st_size, "mtime_ns": path.stat().st_mtime_ns}
+            for path in processed_paths
+        ],
         "epsilon": channel_scaler.epsilon,
         "channels": list(PREFERRED_CHANNELS),
         "features": list(FEATURE_NAMES),
@@ -133,7 +138,7 @@ def collect_features(
     if cache_dir is not None:
         cache_root = Path(cache_dir)
         safe_key = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(cache_key)).strip("._") or "features"
-        signature = _feature_cache_signature(recordings, channel_scaler)
+        signature = _feature_cache_signature(recordings, channel_scaler, processed_paths)
         cache_path = cache_root / f"{safe_key}-{signature[:20]}"
         cache_path.mkdir(parents=True, exist_ok=True)
         manifest_path = cache_path / "manifest.json"
@@ -157,7 +162,7 @@ def collect_features(
                         and 0 <= completed <= len(recordings) and saved_cursor == expected_cursor):
                         X, y = candidate_x, candidate_y
                         completed_recordings, cursor = completed, saved_cursor
-            except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+            except (OSError, ValueError, TypeError, KeyError, IndexError, json.JSONDecodeError):
                 X = y = None
 
         if X is None:
