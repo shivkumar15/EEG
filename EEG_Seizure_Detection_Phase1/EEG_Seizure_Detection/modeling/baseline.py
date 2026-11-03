@@ -73,9 +73,10 @@ def collect_features(
         with np.load(path, allow_pickle=False) as saved:
             if "y" not in saved.files:
                 raise ValueError(f"{path.name} is missing the y array")
-            labels = np.asarray(saved["y"], dtype=np.int8)
-        if labels.ndim != 1 or len(labels) == 0 or not np.isin(labels, (0, 1)).all():
+            raw_labels = np.asarray(saved["y"])
+        if raw_labels.ndim != 1 or len(raw_labels) == 0 or not np.isin(raw_labels, (0, 1)).all():
             raise ValueError(f"{path.name} has empty or non-binary labels")
+        labels = raw_labels.astype(np.int8, copy=False)
         if bool(np.any(labels == 1)) != (recording.seizure_count > 0):
             raise ValueError(f"{path.name} labels disagree with the audit manifest")
         labels_by_recording.append(labels)
