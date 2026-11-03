@@ -166,8 +166,8 @@ class BaselineUtilityTests(unittest.TestCase):
 
             self.assertEqual(calls["count"], 2)
             resumed_loaded = [
-                SimpleNamespace(X=np.zeros((2, 17, 4), dtype=np.float32), y=target, sfreq=256.0)
-                for target in labels
+                SimpleNamespace(X=np.zeros((2, 17, 4), dtype=np.float32), y=labels[1], sfreq=256.0)
+            ]
             ]
             with (
                 patch("modeling.baseline.load_recording_windows", side_effect=resumed_loaded),
