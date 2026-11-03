@@ -11,6 +11,7 @@ from config import PREFERRED_CHANNELS
 from data_management.dataset_split import LopoFold
 from data_management.patient_mapping import Recording
 from data_management.validation_split import build_patient_validation_split
+from feature_selection.feature_extraction import FEATURE_NAMES, extract_features
 from preprocessing.normalization import FoldChannelStandardizer
 
 _NORMALIZATION_POLICY = "none_fold_train_only_scaling_required"
@@ -30,6 +31,17 @@ class RecordingWindows:
 
 
 @dataclass(frozen=True, slots=True)
+class RecordingFeatures:
+    """Features and aligned labels/metadata for one recording."""
+
+    recording: Recording
+    features: np.ndarray
+    y: np.ndarray
+    starts: np.ndarray
+    sfreq: float
+
+
+@dataclass(frozen=True, slots=True)
 class PreparedFold:
     fold_id: int
     test_patient_id: str
@@ -40,6 +52,7 @@ class PreparedFold:
     processed_dir: Path
 
     def iter_split(self, split: str) -> Iterator[RecordingWindows]:
+        """Stream fold-standardized EEG windows, one recording at a time."""
         groups = {
             "fit": self.fit_recordings,
             "validation": self.validation_recordings,
@@ -52,6 +65,27 @@ class PreparedFold:
             yield RecordingWindows(
                 recording, self.standardizer.transform(item.X),
                 item.y, item.starts, item.sfreq,
+            )
+
+    def iter_features(self, split: str) -> Iterator[RecordingFeatures]:
+        """Stream deterministic feature matrices, one recording at a time.
+
+        Channel standardization is applied by iter_split before extraction.
+        The extractor itself does not fit on labels or data, so validation
+        and outer-test recordings cannot influence fitted preprocessing.
+        """
+        expected_features = len(PREFERRED_CHANNELS) * len(FEATURE_NAMES)
+        for item in self.iter_split(split):
+            matrix = extract_features(item.X, item.sfreq)
+            if matrix.shape != (len(item.y), expected_features):
+                raise RuntimeError(
+                    "Feature extractor returned an unexpected shape: "
+                    f"{matrix.shape}; expected ({len(item.y)}, {expected_features})."
+                )
+            if matrix.dtype != np.float32 or not np.isfinite(matrix).all():
+                raise RuntimeError("Feature matrix must be finite float32.")
+            yield RecordingFeatures(
+                item.recording, matrix, item.y, item.starts, item.sfreq
             )
 
 
