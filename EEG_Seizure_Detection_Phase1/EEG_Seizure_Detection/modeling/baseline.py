@@ -14,7 +14,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score, confusion_matrix, f1_score, precision_score,
-    recall_score, roc_auc_score,
+    precision_recall_curve, recall_score, roc_auc_score,
 )
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -164,23 +164,34 @@ def positive_scores(estimator, X: np.ndarray) -> np.ndarray:
 
 
 def choose_f1_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:
-    """Choose an F1-maximizing threshold using validation labels only."""
+    """Choose an F1-maximizing threshold efficiently using validation labels only.
+
+    precision_recall_curve computes all threshold operating points in one
+    pass over the scores. The previous implementation called f1_score once
+    per unique score, repeatedly scanning the full validation set.
+    """
     y = np.asarray(y_true, dtype=np.int8)
     values = np.asarray(scores, dtype=np.float64)
     if y.ndim != 1 or values.shape != y.shape or not np.isin(y, (0, 1)).all():
         raise ValueError("Expected aligned one-dimensional binary labels and scores")
     if not np.isfinite(values).all() or not np.any(y == 1):
         raise ValueError("Threshold selection requires finite scores and positive labels")
-    candidates = np.unique(values)
-    # Include a threshold above the maximum to represent the all-negative case.
-    candidates = np.concatenate((candidates, [np.nextafter(values.max(), np.inf)]))
-    best_threshold, best_f1 = float(candidates[0]), -1.0
-    for threshold in candidates:
-        predicted = values >= threshold
-        score = f1_score(y, predicted, zero_division=0)
-        if score > best_f1:
-            best_threshold, best_f1 = float(threshold), float(score)
-    return best_threshold
+
+    precision, recall, thresholds = precision_recall_curve(y, values)
+    # The final precision/recall pair has no corresponding threshold.
+    precision = precision[:-1]
+    recall = recall[:-1]
+    denominator = precision + recall
+    f1_values = np.divide(
+        2.0 * precision * recall,
+        denominator,
+        out=np.zeros_like(denominator),
+        where=denominator > 0,
+    )
+    # thresholds are ascending; argmax therefore preserves the previous
+    # implementation's smallest-threshold tie-breaking behavior.
+    best_index = int(np.argmax(f1_values))
+    return float(thresholds[best_index])
 
 
 def calculate_metrics(y_true: np.ndarray, scores: np.ndarray, threshold: float) -> dict:
