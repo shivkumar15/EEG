@@ -86,7 +86,7 @@ class BaselineUtilityTests(unittest.TestCase):
                 np.full((2, 221), 1.0, dtype=np.float32),
                 np.full((2, 221), 2.0, dtype=np.float32),
             ]
-            with patch("modeling.baseline.load_recording_windows", side_effect=loaded), \\
+            with patch("modeling.baseline.load_recording_windows", side_effect=loaded), 
                  patch("modeling.baseline.extract_features", side_effect=feature_matrices):
                 batch = collect_features(recordings, directory, scaler)
 
