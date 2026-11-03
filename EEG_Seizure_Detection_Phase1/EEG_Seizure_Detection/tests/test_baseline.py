@@ -185,6 +185,11 @@ class BaselineUtilityTests(unittest.TestCase):
             ):
                 cached = collect_features(recordings, processed, scaler, cache_dir=cache, cache_key="resume_test")
             self.assertTrue(np.array_equal(cached.X, batch.X))
+            # Close .npy memory maps before TemporaryDirectory cleanup (required on Windows).
+            for array in (batch.X, batch.y, cached.X, cached.y):
+                mmap = getattr(array, "_mmap", None)
+                if mmap is not None:
+                    mmap.close()
     def test_collect_features_rejects_manifest_label_disagreement(self):
         from data_management.patient_mapping import Recording
 
