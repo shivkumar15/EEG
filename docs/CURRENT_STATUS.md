@@ -21,9 +21,19 @@ Feature extraction implements 13 features per channel: mean, standard deviation,
 
 **Important:** Passing unit tests confirms implementation behavior for the tested cases; it does not yet establish scientific correctness of frequency-band estimates.
 
+## Extended synthetic robustness validation
+- GitHub script: `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/scripts/validate_frequency_robustness.py`.
+- User ran the script locally after pulling commit `bc3324b`.
+- Ten near-boundary tones (0.75, 3.5, 4.5, 7.5, 8.5, 12.5, 13.5, 29.5, 30.5, 39.5 Hz) produced sensible dominant-band results; several tones close to a boundary split power almost equally between adjacent bands.
+- Mixed 2 Hz + 10 Hz signal check: PASS; both delta and alpha power were represented.
+- 10 Hz signal plus Gaussian noise (standard deviation 0.3, deterministic seed 42): PASS; alpha remained dominant and all band powers were finite.
+- Welch comparison: 1-second segments give 1 Hz resolution; 2-second segments give 0.5 Hz resolution.
+- In the diagnostic mixed 2 Hz + 10 Hz signal, delta integration was 0.4166667 with existing 1-second bin-only integration versus 0.4895833 with interpolated band edges. With 2-second Welch, both methods reported 0.5 for this particular delta band test.
+- Interpretation is limited to these synthetic tests; no real EEG performance claim is made.
+
 ## Next steps
-1. Extend synthetic validation to frequencies near band edges and noisy/mixed signals.
-2. Review Welch frequency resolution and band-edge integration; adjust only if validation supports a change.
+1. Review and test a candidate implementation using 2-second Welch segments and interpolated band-edge integration, including noisy/mixed signals.
+2. Add automated regression tests for the revised spectral calculation.
 3. Integrate validated feature extraction into the fold-wise pipeline.
 4. Train SVM and Random Forest baselines using nested patient-wise splits.
 
