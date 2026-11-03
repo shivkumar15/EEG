@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import gc
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 import sys
@@ -58,13 +59,16 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
         fold, PROCESSED_DIR, validation_fraction=0.2, random_state=seed
     )
 
-    print("Extracting inner-fit features...", flush=True)
+    cache_root = PROJECT_ROOT / "cache" / "first_fold"
+    print("Extracting/resuming inner-fit features...", flush=True)
     fit_batch = collect_features(
-        prepared.fit_recordings, PROCESSED_DIR, prepared.standardizer
+        prepared.fit_recordings, PROCESSED_DIR, prepared.standardizer,
+        cache_dir=cache_root, cache_key="inner_fit",
     )
-    print("Extracting inner-validation features...", flush=True)
+    print("Extracting/resuming inner-validation features...", flush=True)
     validation_batch = collect_features(
-        prepared.validation_recordings, PROCESSED_DIR, prepared.standardizer
+        prepared.validation_recordings, PROCESSED_DIR, prepared.standardizer,
+        cache_dir=cache_root, cache_key="inner_validation",
     )
 
     inner_model = build_baseline_estimators(random_state=seed)["logistic_regression"]
@@ -87,11 +91,13 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
 
     print("Extracting all outer-training features...", flush=True)
     outer_train_batch = collect_features(
-        fold.train_recordings, PROCESSED_DIR, outer_scaler
+        fold.train_recordings, PROCESSED_DIR, outer_scaler,
+        cache_dir=cache_root, cache_key="outer_train",
     )
-    print("Extracting held-out test-patient features...", flush=True)
+    print("Extracting/resuming held-out test-patient features...", flush=True)
     outer_test_batch = collect_features(
-        fold.test_recordings, PROCESSED_DIR, outer_scaler
+        fold.test_recordings, PROCESSED_DIR, outer_scaler,
+        cache_dir=cache_root, cache_key="outer_test",
     )
 
     final_model = build_baseline_estimators(random_state=seed)["logistic_regression"]
@@ -154,6 +160,12 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     print("Outer-test metrics (held-out patient; window-level):", flush=True)
     print(json.dumps(test_metrics, indent=2, sort_keys=True), flush=True)
     print("This result is not the final 23-fold performance estimate.", flush=True)
+
+    # Feature caches are only needed to resume an incomplete run. Preserve them
+    # on any exception/interruption; remove them only after the result is saved.
+    if cache_root.exists():
+        shutil.rmtree(cache_root)
+        print(f"Cleaned completed fold feature cache: {cache_root}", flush=True)
     return result
 
 
