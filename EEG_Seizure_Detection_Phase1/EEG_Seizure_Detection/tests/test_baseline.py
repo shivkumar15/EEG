@@ -168,7 +168,6 @@ class BaselineUtilityTests(unittest.TestCase):
             resumed_loaded = [
                 SimpleNamespace(X=np.zeros((2, 17, 4), dtype=np.float32), y=labels[1], sfreq=256.0)
             ]
-            ]
             with (
                 patch("modeling.baseline.load_recording_windows", side_effect=resumed_loaded),
                 patch("modeling.baseline.extract_features", return_value=np.full((2, 221), 2.0, dtype=np.float32)) as extractor,
