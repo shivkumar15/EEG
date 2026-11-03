@@ -335,8 +335,11 @@ def fit_validate_model(
         raise ValueError("Inner-fit data must contain both classes")
     if len(np.unique(validation_batch.y)) != 2:
         raise ValueError("Validation data must contain both classes for this baseline")
+    print("    fitting inner Logistic Regression...", flush=True)
     estimator.fit(fit_batch.X, fit_batch.y)
+    print("    scoring inner-validation windows...", flush=True)
     scores = positive_scores(estimator, validation_batch.X)
+    print("    selecting F1 threshold from validation scores...", flush=True)
     threshold = choose_f1_threshold(validation_batch.y, scores)
     return estimator, threshold, calculate_metrics(validation_batch.y, scores, threshold)
 
