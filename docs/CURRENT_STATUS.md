@@ -10,40 +10,41 @@ Active repository: https://github.com/shivkumar15/EEG
 - Patient-wise evaluation: 23 LOPO folds; every eligible recording tested once; patient leakage checks passed.
 - Nested validation: 17 fit patients, 5 validation patients, 1 outer test patient per fold.
 - Fold-wise standardization is fitted on inner-fit patients only.
-- Feature extraction source and its focused tests are pushed to GitHub main:
+- Feature extraction source and tests are on GitHub main:
   - `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/feature_selection/feature_extraction.py`
   - `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/tests/test_feature_extraction.py`
-- Full regression suite rerun by the user after GitHub synchronization: **95 tests passed, 0 failures** (0.470 seconds).
-- Synthetic pure-tone validation: **5/5 passed** (2 Hz delta, 6 Hz theta, 10 Hz alpha, 20 Hz beta, 35 Hz gamma); each tone's expected band had the highest extracted power.
+- Latest implementation uses up to 2-second Welch segments and interpolated PSD values at configured band edges.
+- User-reported verification after pulling the updated implementation:
+  - Pure-tone validation: 5/5 passed.
+  - Boundary-frequency diagnostic: 10 frequencies produced sensible dominant-band results.
+  - Mixed 2 Hz + 10 Hz signal: PASS.
+  - Noisy 10 Hz alpha signal: PASS; finite band powers and alpha remained dominant.
+  - Full regression suite: **97 tests passed, 0 failures** in 0.468 seconds.
 
 ## In progress — Phase 4, Milestone 4.1
-Feature extraction implements 13 features per channel: mean, standard deviation, variance, RMS, line length, skewness, excess kurtosis, five EEG band powers, and spectral entropy. The spectral calculation has now been updated on GitHub to use up to 2-second Welch segments and interpolated PSD values at band edges. Two additional synthetic power regression tests were added.
+Feature extraction implements 13 features per channel: mean, standard deviation, variance, RMS, line length, skewness, excess kurtosis, five EEG band powers, and spectral entropy.
 
-**Verification pending:** The updated implementation and expanded test suite have not yet been run by the user locally. The earlier 95/95 test result applies to the previous implementation, not this latest change.
+The revised spectral calculation:
+- Uses up to 2-second Welch segments (512 samples at 256 Hz; 0.5 Hz bin spacing).
+- Integrates band power between exact configured band edges using interpolated PSD values.
+- Has synthetic expected-power regression tests: 2 Hz unit-amplitude sine gives approximately 0.5 delta power; 10 Hz amplitude-0.5 sine gives approximately 0.125 alpha power.
 
-## Extended synthetic robustness validation
-- GitHub script: `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/scripts/validate_frequency_robustness.py`.
-- User ran the script locally after pulling commit `bc3324b`.
-- Ten near-boundary tones (0.75, 3.5, 4.5, 7.5, 8.5, 12.5, 13.5, 29.5, 30.5, 39.5 Hz) produced sensible dominant-band results; several tones close to a boundary split power almost equally between adjacent bands.
-- Mixed 2 Hz + 10 Hz signal check: PASS; both delta and alpha power were represented.
-- 10 Hz signal plus Gaussian noise (standard deviation 0.3, deterministic seed 42): PASS; alpha remained dominant and all band powers were finite.
-- Welch comparison: 1-second segments give 1 Hz resolution; 2-second segments give 0.5 Hz resolution.
-- In the diagnostic mixed 2 Hz + 10 Hz signal, delta integration was 0.4166667 with existing 1-second bin-only integration versus 0.4895833 with interpolated band edges. With 2-second Welch, both methods reported 0.5 for this particular delta band test.
-- Interpretation is limited to these synthetic tests; no real EEG performance claim is made.
+**Interpretation:** These results verify implementation behavior on the tested synthetic signals. They do not establish performance on real EEG or seizure detection accuracy.
 
-## Latest GitHub implementation
-- Feature extractor update commit: `5487307`.
-- Test update commit: `f3d54ed`.
-- Welch segment target: up to 2 seconds (512 samples at 256 Hz), limited by available signal length.
-- Band power now integrates from exact configured low/high boundaries using interpolated PSD values.
-- Added tests checking expected integrated power for a 2 Hz unit-amplitude sine (approximately 0.5 in delta) and a 10 Hz amplitude-0.5 sine (approximately 0.125 in alpha).
+## Synthetic validation records
+- Pure-tone script: `scripts/validate_frequency_features.py`.
+- Extended robustness script: `scripts/validate_frequency_robustness.py`.
+- Tested boundary-near frequencies: 0.75, 3.5, 4.5, 7.5, 8.5, 12.5, 13.5, 29.5, 30.5 and 39.5 Hz.
+- Mixed signal: 2 Hz plus 10 Hz.
+- Noisy signal: 10 Hz plus Gaussian noise (standard deviation 0.3, seed 42).
+- Synthetic tests do not replace validation on actual CHB-MIT EEG.
 
 ## Next steps
-1. Pull latest `main` and run focused feature extraction tests.
-2. Run both synthetic validation scripts against the updated extractor.
-3. Run the complete regression suite.
-4. Review results before integrating feature extraction into the fold-wise pipeline.
-5. Train SVM and Random Forest baselines using nested patient-wise splits only after verification.
+1. Review the feature extractor's scientific assumptions and spectral entropy definition.
+2. Integrate feature extraction into the fold-wise data pipeline without patient leakage.
+3. Add integration tests for fold-wise feature generation.
+4. Train SVM and Random Forest baselines using nested patient-wise splits.
+5. Evaluate and report window-level and event-level metrics separately.
 
 ## Not started
 - Classical baseline model training and final metrics.
