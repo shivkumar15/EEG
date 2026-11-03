@@ -49,35 +49,74 @@ def collect_features(
     recordings: Sequence[Recording], processed_dir,
     channel_scaler: FoldChannelStandardizer,
 ) -> FeatureBatch:
-    """Extract one recording at a time, retaining only its feature rows.
+    """Extract features into one preallocated matrix, one recording at a time.
 
-    This is intended for one LOPO fold/split, not the entire 683-recording
-    cohort. Feature matrices are float32 until concatenation.
+    A label-only first pass determines the output size without decompressing
+    EEG arrays. The second pass loads one recording, extracts its features,
+    copies them into the final matrix, and releases the recording before the
+    next one. Per-window recording path strings are intentionally not stored.
     """
+    from data_management.fold_data import processed_path_for_recording
+
     if not recordings:
         raise ValueError("Cannot collect features from an empty recording list")
-    matrices: list[np.ndarray] = []
-    labels: list[np.ndarray] = []
-    paths: list[str] = []
-    expected_columns = None
+
+    total_windows = 0
+    labels_by_recording = []
     for recording in recordings:
+        path = processed_path_for_recording(processed_dir, recording)
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"Processed windows missing for {recording.relative_path}: {path}"
+            )
+        with np.load(path, allow_pickle=False) as saved:
+            if "y" not in saved.files:
+                raise ValueError(f"{path.name} is missing the y array")
+            labels = np.asarray(saved["y"], dtype=np.int8)
+        if labels.ndim != 1 or len(labels) == 0 or not np.isin(labels, (0, 1)).all():
+            raise ValueError(f"{path.name} has empty or non-binary labels")
+        if bool(np.any(labels == 1)) != (recording.seizure_count > 0):
+            raise ValueError(f"{path.name} labels disagree with the audit manifest")
+        labels_by_recording.append(labels)
+        total_windows += len(labels)
+
+    feature_count = 17 * 13
+    X = np.empty((total_windows, feature_count), dtype=np.float32)
+    y = np.empty(total_windows, dtype=np.int8)
+    cursor = 0
+
+    for index, (recording, expected_y) in enumerate(
+        zip(recordings, labels_by_recording), start=1
+    ):
         item = load_recording_windows(processed_dir, recording)
+        if not np.array_equal(item.y, expected_y):
+            raise RuntimeError(
+                f"Labels changed between metadata and feature pass: {recording.relative_path}"
+            )
         standardized = channel_scaler.transform(item.X)
         features = extract_features(standardized, item.sfreq)
-        if expected_columns is None:
-            expected_columns = features.shape[1]
-        if features.ndim != 2 or features.shape != (len(item.y), expected_columns):
-            raise RuntimeError(f"Invalid feature matrix for {recording.relative_path}")
+        expected_shape = (len(item.y), feature_count)
+        if features.shape != expected_shape or features.dtype != np.float32:
+            raise RuntimeError(
+                f"Invalid feature matrix for {recording.relative_path}: "
+                f"{features.shape}, {features.dtype}"
+            )
         if not np.isfinite(features).all():
             raise RuntimeError(f"Non-finite features for {recording.relative_path}")
-        matrices.append(features)
-        labels.append(item.y)
-        paths.extend([recording.relative_path] * len(item.y))
-    X = np.concatenate(matrices, axis=0).astype(np.float32, copy=False)
-    y = np.concatenate(labels).astype(np.int8, copy=False)
-    if len(X) != len(y) or not np.isin(y, (0, 1)).all():
+        next_cursor = cursor + len(item.y)
+        X[cursor:next_cursor] = features
+        y[cursor:next_cursor] = item.y
+        cursor = next_cursor
+        if index % 25 == 0 or index == len(recordings):
+            print(
+                f"    feature extraction: {index}/{len(recordings)} recordings",
+                flush=True,
+            )
+        del item, standardized, features
+
+    if cursor != total_windows or not np.isin(y, (0, 1)).all():
         raise RuntimeError("Collected features and binary labels are inconsistent")
-    return FeatureBatch(X, y, tuple(paths))
+    return FeatureBatch(X, y, ())
 
 
 def build_baseline_estimators(random_state: int = 42) -> dict[str, Pipeline]:
