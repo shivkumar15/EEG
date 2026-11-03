@@ -60,3 +60,13 @@ A separate foundation branch exists: `feature/react-dashboard-foundation`, commi
 
 ## Research safeguards
 No random window-level train/test split. Fit all preprocessing, feature selection, thresholds and hyperparameters using training/validation patients only. Report window-level and event-level results separately. Fold-standardized band powers must not be described as calibrated physical microvolt-squared power. This is an academic research prototype, not a medical device.
+
+
+## 3 November 2026 — Baseline utility milestone 4.3
+
+- Baseline utilities are implemented on GitHub main in EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/modeling/baseline.py.
+- Added feature collection with recording-at-a-time extraction, training-only channel standardizer fitting, Logistic Regression and Random Forest pipelines, positive-class scoring, validation-only F1 threshold selection, and window-level metrics.
+- Added tests in tests/test_baseline.py.
+- User-reported local verification: focused baseline tests 5/5 passed; complete regression suite 103/103 passed, 0 failures, in 0.446 seconds.
+- These tests verify software utilities only. No real-EEG baseline training or seizure-detection performance metrics have been produced.
+- Next: implement a controlled first-LOPO-fold runner, inspect class counts and memory, and settle the threshold/refit protocol before any outer-test evaluation. Reusing a threshold after refitting a model can change score calibration; this must not be assumed valid.
