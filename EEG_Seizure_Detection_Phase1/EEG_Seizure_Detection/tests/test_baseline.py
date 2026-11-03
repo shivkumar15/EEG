@@ -28,6 +28,29 @@ class BaselineUtilityTests(unittest.TestCase):
         threshold = choose_f1_threshold(y, scores)
         self.assertEqual(calculate_metrics(y, scores, threshold)["f1"], 1.0)
 
+    def test_threshold_matches_brute_force_for_repeated_scores(self):
+        y = np.array([0, 1, 0, 1, 0, 1, 0, 0, 1], dtype=np.int8)
+        scores = np.array([0.1, 0.4, 0.4, 0.8, 0.2, 0.8, 0.1, 0.4, 0.6])
+        candidates = np.unique(scores)
+        expected = None
+        best_f1 = -1.0
+        from sklearn.metrics import f1_score
+        for candidate in candidates:
+            current = f1_score(y, scores >= candidate, zero_division=0)
+            if current > best_f1:
+                expected, best_f1 = float(candidate), float(current)
+        self.assertEqual(choose_f1_threshold(y, scores), expected)
+
+    def test_threshold_scales_to_large_validation_arrays(self):
+        rng = np.random.default_rng(123)
+        y = rng.integers(0, 2, size=200_000, dtype=np.int8)
+        y[0] = 1
+        scores = rng.random(200_000)
+        threshold = choose_f1_threshold(y, scores)
+        self.assertTrue(np.isfinite(threshold))
+        self.assertGreaterEqual(threshold, float(scores.min()))
+        self.assertLessEqual(threshold, float(scores.max()))
+
     def test_metrics_report_confusion_counts_and_imbalance_metrics(self):
         y = np.array([0, 0, 0, 1, 1])
         scores = np.array([0.1, 0.2, 0.8, 0.7, 0.9])
