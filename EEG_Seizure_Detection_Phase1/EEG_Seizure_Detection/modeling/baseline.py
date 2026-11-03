@@ -40,8 +40,15 @@ def fit_channel_standardizer(
     scaler = FoldChannelStandardizer()
 
     def batches():
-        for recording in recordings:
-            yield load_recording_windows(processed_dir, recording).X
+        for index, recording in enumerate(recordings, start=1):
+            item = load_recording_windows(processed_dir, recording)
+            yield item.X
+            del item
+            if index % 25 == 0 or index == len(recordings):
+                print(
+                    f"    channel-scaler fit: {index}/{len(recordings)} recordings",
+                    flush=True,
+                )
 
     return scaler.fit_batches(batches())
 
