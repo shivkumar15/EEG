@@ -163,6 +163,10 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
 
     # Feature caches are only needed to resume an incomplete run. Preserve them
     # on any exception/interruption; remove them only after the result is saved.
+    # Release read-only memory maps before deleting their backing files
+    # (required on Windows).
+    del outer_train_batch, outer_test_batch, final_model, test_scores
+    gc.collect()
     if cache_root.exists():
         shutil.rmtree(cache_root)
         print(f"Cleaned completed fold feature cache: {cache_root}", flush=True)
