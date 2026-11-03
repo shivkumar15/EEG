@@ -100,8 +100,10 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
         cache_dir=cache_root, cache_key="outer_test",
     )
 
+    print("Training final Logistic Regression on all outer-training patients...", flush=True)
     final_model = build_baseline_estimators(random_state=seed)["logistic_regression"]
     final_model.fit(outer_train_batch.X, outer_train_batch.y)
+    print("Scoring held-out patient...", flush=True)
     test_scores = positive_scores(final_model, outer_test_batch.X)
     test_metrics = calculate_metrics(outer_test_batch.y, test_scores, threshold)
 
