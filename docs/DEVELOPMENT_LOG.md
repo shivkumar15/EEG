@@ -63,17 +63,18 @@ Current milestone: **4.1 — feature extraction and scientific validation**.
 - For the diagnostic mixed 2 Hz + 10 Hz signal, delta power was 0.4166667 using the existing 1-second bin-only integration and 0.4895833 with interpolated band edges. At 2-second Welch, both methods gave 0.5 for this test.
 - These are synthetic diagnostics only and do not establish performance on real EEG.
 
-#### Candidate spectral improvement pushed — verification pending
+#### Candidate spectral improvement — verified by user locally
 - Updated `feature_selection/feature_extraction.py` in commit `5487307915967a6b7c5cfd9fed745db97d2670fd`.
 - Welch now uses up to 2-second segments (`nperseg=min(signal_length, round(2 * sfreq))`), providing 0.5 Hz bin spacing at 256 Hz when the window is at least 2 seconds long.
 - Band powers now integrate from each configured lower and upper edge, interpolating PSD values at both edges before trapezoidal integration.
 - Updated `tests/test_feature_extraction.py` in commit `f3d54ed5b5547287a1a4be1c41e5747340b6f1e1` with synthetic expected-power checks: 2 Hz unit-amplitude sine should yield about 0.5 delta power; 10 Hz amplitude-0.5 sine should yield about 0.125 alpha power.
-- These changes are pushed to GitHub main but have not yet been run by the user. The earlier 95-test result belongs to the prior implementation.
+- User ran both synthetic validation scripts after pulling the changes. Pure-tone tests: 5/5 passed; ten boundary-near frequencies produced sensible dominant-band results; mixed 2 Hz + 10 Hz check passed; noisy 10 Hz signal retained alpha dominance with finite band powers.
+- User ran the full regression suite after the changes: **97 tests passed, 0 failures** in 0.468 seconds.
+- These results verify the tested synthetic cases and software regression suite; they do not establish real-EEG seizure detection performance.
 
 #### Still pending in milestone 4.1
-- Run focused tests and both synthetic validation scripts against the updated implementation.
-- Run the full regression suite and inspect any failures before accepting the spectral changes.
-- Review Welch frequency resolution and band-edge integration before freezing feature definitions.
+- Review the scientific assumptions and spectral entropy definition.
+- Integrate feature extraction into the fold-wise data pipeline and add integration tests.
 - Fold-standardized input changes the scale of absolute band-power features; do not describe these as calibrated physical EEG power in microvolt-squared units.
 - Integrate feature extraction into the fold-wise data pipeline only after scientific checks pass.
 
