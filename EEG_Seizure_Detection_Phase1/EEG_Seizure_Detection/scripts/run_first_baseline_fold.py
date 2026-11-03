@@ -97,9 +97,7 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     final_model = build_baseline_estimators(random_state=seed)["logistic_regression"]
     final_model.fit(outer_train_batch.X, outer_train_batch.y)
     test_scores = positive_scores(final_model, outer_test_batch.X)
-    test_metrics = calculate_metrics(
-        outer_test_batch.y, test_scores, validation_threshold=threshold
-    ) if False else calculate_metrics(outer_test_batch.y, test_scores, threshold)
+    test_metrics = calculate_metrics(outer_test_batch.y, test_scores, threshold)
 
     result = {
         "experiment": "first_nested_lopo_logistic_regression",
