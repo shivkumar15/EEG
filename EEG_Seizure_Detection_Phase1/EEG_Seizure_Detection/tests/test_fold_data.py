@@ -22,7 +22,7 @@ def make_recording(number, seizures=0):
 
 
 def save_recording(directory, recording, value):
-    X = np.full((2, len(PREFERRED_CHANNELS), 8), value, dtype=np.float32)
+    X = np.full((2, len(PREFERRED_CHANNELS), 2560), value, dtype=np.float32)
     y = np.array([0, 1] if recording.seizure_count else [0, 0], dtype=np.int64)
     path = processed_path_for_recording(directory, recording)
     np.savez_compressed(
@@ -39,7 +39,7 @@ class FoldDataTests(unittest.TestCase):
             item = make_recording(2, seizures=1)
             save_recording(directory, item, 2.0)
             loaded = load_recording_windows(directory, item)
-            self.assertEqual(loaded.X.shape, (2, len(PREFERRED_CHANNELS), 8))
+            self.assertEqual(loaded.X.shape, (2, len(PREFERRED_CHANNELS), 2560))
             np.testing.assert_array_equal(loaded.y, [0, 1])
 
     def test_loader_rejects_missing_recording(self):
@@ -73,16 +73,53 @@ class FoldDataTests(unittest.TestCase):
             self.assertEqual(test_items[0].X.dtype, np.float32)
             self.assertGreater(float(np.mean(test_items[0].X)), 100.0)
 
+            feature_items = list(prepared.iter_features("test"))
+            self.assertEqual(len(feature_items), 1)
+            result = feature_items[0]
+            self.assertEqual(result.features.shape, (2, 221))
+            self.assertEqual(result.features.dtype, np.float32)
+            self.assertTrue(np.isfinite(result.features).all())
+            np.testing.assert_array_equal(result.y, test_items[0].y)
+            np.testing.assert_array_equal(result.starts, test_items[0].starts)
+            self.assertEqual(result.recording, outer_test)
+
+    def test_feature_iteration_supports_each_split(self):
+        with tempfile.TemporaryDirectory() as directory:
+            train = [make_recording(n, seizures=(1 if n == 1 else 0))
+                     for n in range(1, 7)]
+            outer_test = make_recording(7, seizures=1)
+            for index, item in enumerate([*train, outer_test], start=1):
+                save_recording(directory, item, float(index))
+            fold = LopoFold(7, outer_test.patient_id, tuple(train), (outer_test,))
+            prepared = prepare_lopo_fold(
+                fold, directory, validation_fraction=0.33, random_state=3
+            )
+
+            for split in ("fit", "validation", "test"):
+                items = list(prepared.iter_features(split))
+                expected = {
+                    "fit": prepared.fit_recordings,
+                    "validation": prepared.validation_recordings,
+                    "test": prepared.test_recordings,
+                }[split]
+                self.assertEqual(
+                    [item.recording for item in items], list(expected)
+                )
+                for item in items:
+                    self.assertEqual(item.features.shape, (2, 221))
+                    self.assertEqual(item.y.shape, (2,))
+                    self.assertEqual(item.starts.shape, (2,))
+
     def test_invalid_split_name_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             item = make_recording(7)
             save_recording(directory, item, 7.0)
-            fold = LopoFold(7, item.patient_id, (make_recording(1), make_recording(2)), (item,))
-            # Fit setup is intentionally omitted; the iterator rejects the key first.
             from data_management.fold_data import PreparedFold
             from preprocessing.normalization import FoldChannelStandardizer
-            prepared = PreparedFold(1, item.patient_id, (), (), (item,),
-                                    FoldChannelStandardizer(), __import__("pathlib").Path(directory))
+            prepared = PreparedFold(
+                1, item.patient_id, (), (), (item,),
+                FoldChannelStandardizer(), __import__("pathlib").Path(directory)
+            )
             with self.assertRaisesRegex(ValueError, "split must be"):
                 list(prepared.iter_split("unknown"))
 
