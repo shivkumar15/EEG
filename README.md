@@ -11,6 +11,8 @@ An academic EEG seizure-detection project using the CHB-MIT Scalp EEG Database. 
 
 ## Project Documentation
 
+0. [Current Project Status](docs/CURRENT_STATUS.md)
+
 1. [Project Master Plan](docs/PROJECT_MASTER_PLAN.md)
 2. [AI / Teammate Handoff](docs/AI_HANDOFF.md)
 3. [Development Log](docs/DEVELOPMENT_LOG.md)
