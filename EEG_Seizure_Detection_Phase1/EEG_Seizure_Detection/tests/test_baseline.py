@@ -1,4 +1,8 @@
 import unittest
+import tempfile
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
@@ -8,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from modeling.baseline import (
     FeatureBatch, calculate_metrics, choose_f1_threshold,
     fit_validate_model, positive_scores, build_baseline_estimators,
+    collect_features,
 )
 
 
@@ -55,6 +60,56 @@ class BaselineUtilityTests(unittest.TestCase):
         self.assertTrue(np.isfinite(positive_scores(fitted, X_val)).all())
         self.assertGreaterEqual(threshold, float(np.min(positive_scores(fitted, X_val))))
         self.assertIn("f1", metrics)
+
+    def test_collect_features_preallocates_aligned_float32_matrix(self):
+        from data_management.patient_mapping import Recording
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            recordings = [
+                Recording("chb01", "patient_01", "chb01_01.edf", "chb01/chb01_01.edf",
+                          0, (), "test", "SUCCESS"),
+                Recording("chb02", "patient_02", "chb02_01.edf", "chb02/chb02_01.edf",
+                          1, ("10-20",), "test", "SUCCESS"),
+            ]
+            labels = [np.array([0, 0], dtype=np.int8), np.array([0, 1], dtype=np.int8)]
+            for recording, target in zip(recordings, labels):
+                filename = f"{recording.subject}_{Path(recording.edf_file).stem}.npz"
+                np.savez_compressed(directory / filename, y=target)
+
+            loaded = [
+                SimpleNamespace(X=np.zeros((2, 17, 4), dtype=np.float32), y=target, sfreq=256.0)
+                for target in labels
+            ]
+            scaler = SimpleNamespace(transform=lambda values: values)
+            feature_matrices = [
+                np.full((2, 221), 1.0, dtype=np.float32),
+                np.full((2, 221), 2.0, dtype=np.float32),
+            ]
+            with patch("modeling.baseline.load_recording_windows", side_effect=loaded), \\
+                 patch("modeling.baseline.extract_features", side_effect=feature_matrices):
+                batch = collect_features(recordings, directory, scaler)
+
+            self.assertEqual(batch.X.shape, (4, 221))
+            self.assertEqual(batch.X.dtype, np.float32)
+            self.assertTrue(np.array_equal(batch.y, np.array([0, 0, 0, 1], dtype=np.int8)))
+            self.assertTrue(np.all(batch.X[:2] == 1.0))
+            self.assertTrue(np.all(batch.X[2:] == 2.0))
+            self.assertEqual(batch.recording_paths, ())
+
+    def test_collect_features_rejects_manifest_label_disagreement(self):
+        from data_management.patient_mapping import Recording
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            recording = Recording(
+                "chb01", "patient_01", "chb01_01.edf", "chb01/chb01_01.edf",
+                1, ("10-20",), "test", "SUCCESS",
+            )
+            filename = f"{recording.subject}_{Path(recording.edf_file).stem}.npz"
+            np.savez_compressed(directory / filename, y=np.array([0, 0], dtype=np.int8))
+            with self.assertRaisesRegex(ValueError, "disagree"):
+                collect_features([recording], directory, SimpleNamespace(transform=lambda x: x))
 
 
 if __name__ == "__main__":
