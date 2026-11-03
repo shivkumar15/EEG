@@ -122,6 +122,70 @@ class BaselineUtilityTests(unittest.TestCase):
             self.assertTrue(np.all(batch.X[2:] == 2.0))
             self.assertEqual(batch.recording_paths, ())
 
+    def test_collect_features_resumes_from_last_completed_recording(self):
+        from data_management.patient_mapping import Recording
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            processed = root / "processed"
+            cache = root / "cache"
+            processed.mkdir()
+            recordings = [
+                Recording("chb01", "patient_01", "chb01_01.edf", "chb01/chb01_01.edf",
+                          0, (), "test", "SUCCESS"),
+                Recording("chb02", "patient_02", "chb02_01.edf", "chb02/chb02_01.edf",
+                          1, ("10-20",), "test", "SUCCESS"),
+            ]
+            labels = [np.array([0, 0], dtype=np.int8), np.array([0, 1], dtype=np.int8)]
+            for recording, target in zip(recordings, labels):
+                filename = f"{recording.subject}_{Path(recording.edf_file).stem}.npz"
+                np.savez_compressed(processed / filename, y=target)
+
+            scaler = SimpleNamespace(
+                mean_=np.zeros(17), scale_=np.ones(17), epsilon=1e-6,
+                transform=lambda values: values,
+            )
+            loaded = [
+                SimpleNamespace(X=np.zeros((2, 17, 4), dtype=np.float32), y=target, sfreq=256.0)
+                for target in labels
+            ]
+            calls = {"count": 0}
+
+            def interrupt_after_first_recording(values, sfreq):
+                calls["count"] += 1
+                if calls["count"] == 1:
+                    return np.full((2, 221), 1.0, dtype=np.float32)
+                raise RuntimeError("simulated interruption")
+
+            with (
+                patch("modeling.baseline.load_recording_windows", side_effect=loaded),
+                patch("modeling.baseline.extract_features", side_effect=interrupt_after_first_recording),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "simulated interruption"):
+                    collect_features(recordings, processed, scaler, cache_dir=cache, cache_key="resume_test")
+
+            self.assertEqual(calls["count"], 2)
+            resumed_loaded = [
+                SimpleNamespace(X=np.zeros((2, 17, 4), dtype=np.float32), y=target, sfreq=256.0)
+                for target in labels
+            ]
+            with (
+                patch("modeling.baseline.load_recording_windows", side_effect=resumed_loaded),
+                patch("modeling.baseline.extract_features", return_value=np.full((2, 221), 2.0, dtype=np.float32)) as extractor,
+            ):
+                batch = collect_features(recordings, processed, scaler, cache_dir=cache, cache_key="resume_test")
+
+            self.assertEqual(extractor.call_count, 1)
+            self.assertTrue(np.array_equal(batch.X[:2], np.full((2, 221), 1.0, dtype=np.float32)))
+            self.assertTrue(np.array_equal(batch.X[2:], np.full((2, 221), 2.0, dtype=np.float32)))
+            self.assertTrue(np.array_equal(batch.y, np.array([0, 0, 0, 1], dtype=np.int8)))
+
+            with (
+                patch("modeling.baseline.load_recording_windows", side_effect=AssertionError("cache should be reused")),
+                patch("modeling.baseline.extract_features", side_effect=AssertionError("cache should be reused")),
+            ):
+                cached = collect_features(recordings, processed, scaler, cache_dir=cache, cache_key="resume_test")
+            self.assertTrue(np.array_equal(cached.X, batch.X))
     def test_collect_features_rejects_manifest_label_disagreement(self):
         from data_management.patient_mapping import Recording
 
