@@ -50,10 +50,12 @@ Current milestone: **4.1 — feature extraction and scientific validation**.
 - Uses Welch PSD and SciPy trapezoidal integration. Constant/near-constant signal skewness and kurtosis are set to zero to avoid NaN output.
 - Full regression suite was rerun by the user after synchronization: **95 tests passed, 0 failures** in 0.470 seconds.
 - This is a unit/regression result, not yet evidence that frequency-band estimates are scientifically validated.
+- Synthetic frequency validation script: `scripts/validate_frequency_features.py` (local; successful run reported by user).
+- **Synthetic pure-tone validation: 5/5 passed** — 2 Hz correctly dominant in delta, 6 Hz in theta, 10 Hz in alpha, 20 Hz in beta, and 35 Hz in gamma.
+- This confirms expected band dominance for clean in-band pure tones at 256 Hz. It does not validate noisy/mixed EEG, boundary frequencies, or clinical performance.
 
 #### Still pending in milestone 4.1
-- Create and run `scripts/validate_frequency_features.py` with synthetic pure-tone signals: 2 Hz delta, 6 Hz theta, 10 Hz alpha, 20 Hz beta, and 35 Hz gamma.
-- Verify expected band dominance.
+- Extend validation to frequencies near band boundaries and noisy/mixed signals.
 - Review Welch frequency resolution and band-edge integration before freezing feature definitions.
 - Fold-standardized input changes the scale of absolute band-power features; do not describe these as calibrated physical EEG power in microvolt-squared units.
 - Integrate feature extraction into the fold-wise data pipeline only after scientific checks pass.
