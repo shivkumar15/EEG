@@ -173,3 +173,24 @@ def fit_validate_model(
     scores = positive_scores(estimator, validation_batch.X)
     threshold = choose_f1_threshold(validation_batch.y, scores)
     return estimator, threshold, calculate_metrics(validation_batch.y, scores, threshold)
+
+
+def refit_and_evaluate(
+    estimator, outer_train_batch: FeatureBatch, outer_test_batch: FeatureBatch,
+    validation_threshold: float,
+) -> tuple[object, dict]:
+    """Refit a fresh estimator on all outer-training patients, then test once.
+
+    Callers must build both batches using a channel standardizer fitted on
+    all outer-training patients. The threshold is frozen from inner validation;
+    outer-test labels are used only by calculate_metrics after predictions.
+    """
+    if len(np.unique(outer_train_batch.y)) != 2:
+        raise ValueError("Outer-training data must contain both classes")
+    if not np.isfinite(validation_threshold):
+        raise ValueError("Validation threshold must be finite")
+    estimator.fit(outer_train_batch.X, outer_train_batch.y)
+    test_scores = positive_scores(estimator, outer_test_batch.X)
+    return estimator, calculate_metrics(
+        outer_test_batch.y, test_scores, float(validation_threshold)
+    )
