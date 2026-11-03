@@ -20,8 +20,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from data_management.fold_data import load_recording_windows
+from config import PREFERRED_CHANNELS
 from data_management.patient_mapping import Recording
-from feature_selection.feature_extraction import extract_features
+from feature_selection.feature_extraction import FEATURE_NAMES, extract_features
 from preprocessing.normalization import FoldChannelStandardizer
 
 
@@ -80,7 +81,7 @@ def collect_features(
         labels_by_recording.append(labels)
         total_windows += len(labels)
 
-    feature_count = 17 * 13
+    feature_count = len(PREFERRED_CHANNELS) * len(FEATURE_NAMES)
     X = np.empty((total_windows, feature_count), dtype=np.float32)
     y = np.empty(total_windows, dtype=np.int8)
     cursor = 0
