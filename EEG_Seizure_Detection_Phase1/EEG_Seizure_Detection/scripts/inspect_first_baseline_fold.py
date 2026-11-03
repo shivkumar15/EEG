@@ -11,8 +11,15 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from pathlib import Path
+import sys
 
 import numpy as np
+
+# Running a file inside scripts/ puts that directory, not the project root,
+# on sys.path. Add the project root so top-level project modules are importable.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import PROCESSED_DIR
 from data_management.cohort import filter_primary_cohort
