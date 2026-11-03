@@ -10,18 +10,21 @@ Active repository: https://github.com/shivkumar15/EEG
 - Patient-wise evaluation: 23 LOPO folds; every eligible recording tested once; patient leakage checks passed.
 - Nested validation: 17 fit patients, 5 validation patients, 1 outer test patient per fold.
 - Fold-wise standardization is fitted on inner-fit patients only.
-- Feature extraction source and tests are on GitHub main:
-  - `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/feature_selection/feature_extraction.py`
-  - `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/tests/test_feature_extraction.py`
-- Latest implementation uses up to 2-second Welch segments and interpolated PSD values at configured band edges.
-- User-reported verification after pulling the updated implementation:
+- Feature extraction implements 13 features per channel, with synthetic validation:
   - Pure-tone validation: 5/5 passed.
   - Boundary-frequency diagnostic: 10 frequencies produced sensible dominant-band results.
   - Mixed 2 Hz + 10 Hz signal: PASS.
   - Noisy 10 Hz alpha signal: PASS; finite band powers and alpha remained dominant.
-  - Full regression suite: **97 tests passed, 0 failures** in 0.468 seconds.
+- Fold-wise feature integration is implemented in `data_management/fold_data.py`:
+  - `PreparedFold.iter_features("fit"|"validation"|"test")` applies the already-fitted fold standardizer and then extracts features one recording at a time.
+  - Each 10-second window from the fixed 17-channel montage produces 221 float32 features (17 × 13).
+  - Labels, window start timestamps, sampling frequency and recording identity are returned alongside each feature matrix.
+  - Feature extraction is deterministic and does not fit on validation or outer-test data.
+- User-reported local verification after pulling commits `5100a3c` and `372afa0`:
+  - Focused fold-data integration suite: **5 tests passed, 0 failures** in 0.521 seconds.
+  - Full regression suite: **98 tests passed, 0 failures** in 0.874 seconds.
 
-## In progress — Phase 4, Milestone 4.1
+## Phase 4 — feature integration: IMPLEMENTED AND LOCALLY VERIFIED
 Feature extraction implements 13 features per channel: mean, standard deviation, variance, RMS, line length, skewness, excess kurtosis, five EEG band powers, and spectral entropy.
 
 The revised spectral calculation:
@@ -29,7 +32,7 @@ The revised spectral calculation:
 - Integrates band power between exact configured band edges using interpolated PSD values.
 - Has synthetic expected-power regression tests: 2 Hz unit-amplitude sine gives approximately 0.5 delta power; 10 Hz amplitude-0.5 sine gives approximately 0.125 alpha power.
 
-**Interpretation:** These results verify implementation behavior on the tested synthetic signals. They do not establish performance on real EEG or seizure detection accuracy.
+**Interpretation:** These results verify implementation behavior on the tested synthetic signals and software integration. They do not establish performance on real EEG or seizure detection accuracy.
 
 ## Synthetic validation records
 - Pure-tone script: `scripts/validate_frequency_features.py`.
@@ -40,11 +43,10 @@ The revised spectral calculation:
 - Synthetic tests do not replace validation on actual CHB-MIT EEG.
 
 ## Next steps
-1. Review the feature extractor's scientific assumptions and spectral entropy definition.
-2. Integrate feature extraction into the fold-wise data pipeline without patient leakage.
-3. Add integration tests for fold-wise feature generation.
-4. Train SVM and Random Forest baselines using nested patient-wise splits.
-5. Evaluate and report window-level and event-level metrics separately.
+1. Review/freeze feature definitions and spectral entropy interpretation.
+2. Build the baseline training/evaluation workflow using the fold-wise feature iterator.
+3. Train SVM and Random Forest baselines using nested patient-wise splits.
+4. Record out-of-fold predictions and evaluate window-level and event-level metrics separately.
 
 ## Not started
 - Classical baseline model training and final metrics.
@@ -57,4 +59,4 @@ The revised spectral calculation:
 A separate foundation branch exists: `feature/react-dashboard-foundation`, commit `2a08eb9a921db5d84e953510539b6ecdc5e5733d`, with open PR #1: https://github.com/shivkumar15/EEG/pull/1. It contains illustrative mock data only; the local frontend build is not yet verified and the PR is not merged.
 
 ## Research safeguards
-No random window-level train/test split. Fit all preprocessing, feature selection, thresholds and hyperparameters using training/validation patients only. Report window-level and event-level results separately. This is an academic research prototype, not a medical device.
+No random window-level train/test split. Fit all preprocessing, feature selection, thresholds and hyperparameters using training/validation patients only. Report window-level and event-level results separately. Fold-standardized band powers must not be described as calibrated physical microvolt-squared power. This is an academic research prototype, not a medical device.
