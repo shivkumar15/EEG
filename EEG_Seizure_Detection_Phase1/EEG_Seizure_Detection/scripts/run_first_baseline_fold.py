@@ -27,6 +27,7 @@ from config import PROCESSED_DIR, PREFERRED_CHANNELS, RANDOM_STATE
 from data_management.cohort import filter_primary_cohort
 from data_management.dataset_split import build_lopo_folds
 from data_management.fold_data import prepare_lopo_fold
+from data_management.validation_split import build_patient_validation_split
 from data_management.patient_mapping import load_recording_manifest
 from feature_selection.feature_extraction import FEATURE_NAMES
 from modeling.experiment_checkpoints import ModelStageCheckpointStore
@@ -83,10 +84,13 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     print(f"Primary cohort: {len(recordings)} recordings", flush=True)
     print(f"Outer fold {fold.fold_id}: held-out patient {fold.test_patient_id}", flush=True)
     cache_root = PROJECT_ROOT / "cache" / "first_fold"
-    print("Preparing inner fit/validation split and fit-only channel scaler...", flush=True)
-    prepared = prepare_lopo_fold(
-        fold, PROCESSED_DIR, validation_fraction=0.2, random_state=seed,
-        scaler_checkpoint_dir=cache_root / "scalers" / "fold_1_inner_fit",
+    persistent_checkpoint_root = (
+        PROJECT_ROOT / "results" / "baselines" / "checkpoints"
+        / "first_fold_patient_01_logistic_regression"
+    )
+    # Build the deterministic patient split without fitting/loading the scaler.
+    inner_split = build_patient_validation_split(
+        fold.train_recordings, validation_fraction=0.2, random_state=seed
     )
     checkpoint_context = {
         "experiment": "first_nested_lopo_logistic_regression",
@@ -100,8 +104,8 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
             "name": "LogisticRegression", "solver": "liblinear",
             "class_weight": "balanced", "max_iter": 1000,
         },
-        "inner_fit": _recording_fingerprint(prepared.fit_recordings),
-        "inner_validation": _recording_fingerprint(prepared.validation_recordings),
+        "inner_fit": _recording_fingerprint(inner_split.train_recordings),
+        "inner_validation": _recording_fingerprint(inner_split.validation_recordings),
         "outer_train": _recording_fingerprint(fold.train_recordings),
         "outer_test": _recording_fingerprint(fold.test_recordings),
         "features": {
@@ -109,18 +113,25 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
             "feature_names": list(FEATURE_NAMES),
         },
     }
+    # Check durable completed results before scaler fitting or feature extraction.
+    completed_store = ModelStageCheckpointStore(
+        persistent_checkpoint_root, checkpoint_context
+    )
+    completed_result = completed_store.load_json("fold_result")
+    if completed_result is not None and completed_result.get("status") == "completed":
+        _write_result(output_path, completed_result)
+        print(f"Recovered completed fold result: {output_path}", flush=True)
+        return completed_result
+
     stage_store = ModelStageCheckpointStore(
         cache_root / "model_stages" / "fold_1_logistic_regression",
         checkpoint_context,
     )
-    completed_result = stage_store.load_json("fold_result")
-    if completed_result is not None and completed_result.get("status") == "completed":
-        _write_result(output_path, completed_result)
-        print(f"Recovered completed fold result: {output_path}", flush=True)
-        if cache_root.exists():
-            shutil.rmtree(cache_root)
-        return completed_result
-
+    print("Preparing inner fit/validation split and fit-only channel scaler...", flush=True)
+    prepared = prepare_lopo_fold(
+        fold, PROCESSED_DIR, validation_fraction=0.2, random_state=seed,
+        scaler_checkpoint_dir=cache_root / "scalers" / "fold_1_inner_fit",
+    )
     print("Extracting/resuming inner-fit features...", flush=True)
     fit_batch = collect_features(
         prepared.fit_recordings, PROCESSED_DIR, prepared.standardizer,
@@ -271,6 +282,7 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     }
 
     stage_store.save_json("fold_result", result)
+    completed_store.save_json("fold_result", result)
     _write_result(output_path, result)
     print("\nFIRST-FOLD EXPERIMENT COMPLETED", flush=True)
     print(f"Saved results: {output_path}", flush=True)
