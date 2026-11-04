@@ -43,9 +43,9 @@ class ModelStageCheckpointStore:
     @staticmethod
     def _atomic_json(path: Path, payload: dict) -> None:
         temporary = path.with_suffix(path.suffix + ".tmp")
-        with temporary.open("w", encoding="utf-8", newline="\\n") as stream:
+        with temporary.open("w", encoding="utf-8") as stream:
             json.dump(payload, stream, indent=2, sort_keys=True, allow_nan=False)
-            stream.write("\\n")
+            stream.write(chr(10))
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
