@@ -57,6 +57,37 @@ def _write_result(output_path: Path, result: dict) -> None:
     temporary_path.replace(output_path)
 
 
+def _check_existing_completed_result(output_path: Path) -> None:
+    """Prevent accidental retraining when a completed result lacks a checkpoint."""
+    if not output_path.is_file():
+        return
+
+    try:
+        existing = json.loads(output_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"Existing output cannot be safely inspected: {output_path}. "
+            "Preserve and inspect this file before running again."
+        ) from exc
+
+    if not isinstance(existing, dict):
+        return
+
+    if (
+        existing.get("experiment") == "first_nested_lopo_logistic_regression"
+        and existing.get("status") == "completed"
+        and existing.get("fold_id") == 1
+        and existing.get("held_out_patient") == "patient_01"
+    ):
+        raise RuntimeError(
+            "A completed first-fold result already exists, but no compatible "
+            "durable checkpoint was found. To prevent accidental retraining, "
+            f"the runner has stopped without modifying the result: {output_path}. "
+            "Inspect or archive the existing result before intentionally "
+            "starting a new experiment with a different --output path."
+        )
+
+
 def _recording_fingerprint(recordings):
     values = []
     for item in recordings:
@@ -127,6 +158,10 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
         _write_result(output_path, completed_result)
         print(f"Recovered completed fold result: {output_path}", flush=True)
         return completed_result
+
+    # A legacy output JSON is not a trusted checkpoint because it has no
+    # context signature or artifact manifest. Stop rather than retrain silently.
+    _check_existing_completed_result(output_path)
 
     stage_store = ModelStageCheckpointStore(
         cache_root / "model_stages" / "fold_1_logistic_regression",
