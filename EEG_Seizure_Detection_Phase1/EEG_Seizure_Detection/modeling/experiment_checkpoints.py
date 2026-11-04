@@ -110,7 +110,7 @@ class ModelStageCheckpointStore:
         temporary = Path(temporary_name)
         try:
             joblib.dump(estimator, temporary)
-            with temporary.open("rb") as stream:
+            with temporary.open("rb+") as stream:
                 os.fsync(stream.fileno())
             os.replace(temporary, artifact)
             self._atomic_json(manifest, self._manifest(stage, artifact, "estimator"))
