@@ -54,6 +54,56 @@ class ModelStageCheckpointTests(unittest.TestCase):
             ).load_json("fold_result")
             self.assertEqual(restored, result)
 
+    def test_completed_model_stage_is_reused_after_restart(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            context = {"experiment": "first_fold", "fold": 1, "seed": 42}
+            X = np.array([[-2.0], [-1.0], [1.0], [2.0]])
+            y = np.array([0, 0, 1, 1])
+            fitted = LogisticRegression(random_state=42).fit(X, y)
+
+            first_process = ModelStageCheckpointStore(root, context)
+            first_process.save_estimator("inner_model_fit", fitted)
+
+            # A new store instance represents a fresh process after interruption.
+            restarted_process = ModelStageCheckpointStore(root, context)
+            recovered = restarted_process.load_estimator("inner_model_fit")
+            self.assertIsNotNone(recovered)
+            np.testing.assert_allclose(
+                fitted.predict_proba(X), recovered.predict_proba(X)
+            )
+
+    def test_incompatible_experiment_restarts_instead_of_reusing_stage(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            original = ModelStageCheckpointStore(
+                root, {"fold": 1, "seed": 42, "model": "logistic_regression"}
+            )
+            original.save_json("inner_validation_threshold", {"threshold": 0.37})
+
+            changed_experiment = ModelStageCheckpointStore(
+                root, {"fold": 1, "seed": 43, "model": "logistic_regression"}
+            )
+            self.assertIsNone(
+                changed_experiment.load_json("inner_validation_threshold")
+            )
+
+    def test_completed_score_stage_is_reused_after_restart(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            context = {"fold": 1, "seed": 42}
+            labels = np.array([0, 1, 0, 1], dtype=np.int8)
+            scores = np.array([0.1, 0.9, 0.2, 0.8], dtype=np.float64)
+
+            first_process = ModelStageCheckpointStore(root, context)
+            first_process.save_scores("inner_validation_scores", labels, scores)
+
+            restarted_process = ModelStageCheckpointStore(root, context)
+            recovered = restarted_process.load_scores("inner_validation_scores")
+            self.assertIsNotNone(recovered)
+            np.testing.assert_array_equal(recovered[0], labels)
+            np.testing.assert_array_equal(recovered[1], scores)
+
     def test_corrupt_estimator_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             store = ModelStageCheckpointStore(Path(temporary), {"fold": 1})
