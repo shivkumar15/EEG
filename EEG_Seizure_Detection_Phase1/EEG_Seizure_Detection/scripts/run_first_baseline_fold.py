@@ -38,6 +38,7 @@ from modeling.baseline import (
     collect_features,
     fit_channel_standardizer,
     positive_scores,
+    choose_fbeta_threshold,
 )
 
 
@@ -155,6 +156,15 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     )
     completed_result = completed_store.load_json("fold_result")
     if completed_result is not None and completed_result.get("status") == "completed":
+        # A completed result is only considered fully reusable when its score
+        # artifacts are also present and signature/checksum-valid.
+        if (completed_store.load_scores("inner_validation_scores") is None
+                or completed_store.load_scores("outer_test_scores") is None):
+            raise RuntimeError(
+                "Completed fold result is missing durable score artifacts. "
+                "Preserve it and run a deliberate new experiment with a new "
+                "--output path; do not silently treat summary metrics as recoverable."
+            )
         _write_result(output_path, completed_result)
         print(f"Recovered completed fold result: {output_path}", flush=True)
         return completed_result
@@ -203,6 +213,8 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
         if not np.array_equal(validation_y, validation_batch.y):
             raise RuntimeError("Cached validation labels do not match current validation split")
         print("Reusing completed validation-score checkpoint.", flush=True)
+    # Keep a durable copy outside the disposable working cache.
+    completed_store.save_scores("inner_validation_scores", validation_y, validation_values)
 
     threshold_payload = stage_store.load_json("inner_validation_threshold")
     if threshold_payload is None:
@@ -217,7 +229,22 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
         threshold = float(threshold_payload["threshold"])
         validation_metrics = threshold_payload["metrics"]
 
-    print(f"Validation threshold selected: {threshold:.8g}", flush=True)
+    f2_threshold_payload = stage_store.load_json("inner_validation_f2_threshold")
+    if f2_threshold_payload is None:
+        f2_threshold = choose_fbeta_threshold(validation_y, validation_values, beta=2.0)
+        validation_metrics_f2 = calculate_metrics(validation_y, validation_values, f2_threshold)
+        stage_store.save_json("inner_validation_f2_threshold", {
+            "threshold": float(f2_threshold),
+            "metrics": validation_metrics_f2,
+            "selection": "maximize validation F2 (beta=2)",
+            "beta": 2.0,
+        })
+    else:
+        f2_threshold = float(f2_threshold_payload["threshold"])
+        validation_metrics_f2 = f2_threshold_payload["metrics"]
+
+    print(f"Validation F1 threshold selected: {threshold:.8g}", flush=True)
+    print(f"Validation F2 threshold selected: {f2_threshold:.8g}", flush=True)
     print(
         "Validation metrics: "
         + json.dumps(validation_metrics, sort_keys=True),
@@ -273,7 +300,10 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
         if not np.array_equal(test_y, outer_test_batch.y):
             raise RuntimeError("Cached test labels do not match current held-out patient")
         print("Reusing completed held-out score checkpoint.", flush=True)
+    completed_store.save_scores("outer_test_scores", outer_test_batch.y, test_scores)
     test_metrics = calculate_metrics(outer_test_batch.y, test_scores, threshold)
+    validation_metrics_f2 = calculate_metrics(validation_y, validation_values, f2_threshold)
+    test_metrics_f2 = calculate_metrics(outer_test_batch.y, test_scores, f2_threshold)
 
     result = {
         "experiment": "first_nested_lopo_logistic_regression",
@@ -310,9 +340,14 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
             "method": "maximize validation F1",
             "validation_threshold": float(threshold),
             "outer_test_used_for_selection": False,
+            "comparison_strategy": "F2 threshold is selected independently on inner validation only",
+            "f2_beta": 2.0,
+            "f2_validation_threshold": float(f2_threshold),
         },
         "validation_metrics": validation_metrics,
         "outer_test_metrics": test_metrics,
+        "validation_metrics_f2": validation_metrics_f2,
+        "outer_test_metrics_f2": test_metrics_f2,
         "runtime_seconds": round(perf_counter() - started, 3),
         "limitations": [
             "This is only the first LOPO fold, not the complete 23-fold evaluation.",
