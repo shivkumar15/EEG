@@ -190,14 +190,18 @@ class FoldChannelStandardizer:
         if manifest_path.is_file():
             try:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if manifest.get("schema_version") != _SCALER_CHECKPOINT_VERSION:
+                    raise ValueError("unsupported checkpoint schema")
                 if manifest.get("signature") != signature:
                     raise ValueError("checkpoint signature mismatch")
                 completed = int(manifest["completed_recordings"])
                 state_name = manifest["state_file"]
-                if not 0 <= completed <= int(total_batches):
+                if not isinstance(state_name, str) or Path(state_name).name != state_name:
+                    raise ValueError("invalid checkpoint state filename")
+                if not 0 < completed <= int(total_batches):
                     raise ValueError("invalid completed-recording cursor")
-                if completed == 0:
-                    raise ValueError("zero-progress checkpoint is not reusable")
+                if bool(manifest.get("complete")) != (completed == int(total_batches)):
+                    raise ValueError("checkpoint completion flag mismatch")
                 state_path = root / state_name
                 with np.load(state_path, allow_pickle=False) as saved:
                     state = {
@@ -225,6 +229,7 @@ class FoldChannelStandardizer:
         if completed == int(total_batches):
             return self.finalize()
 
+        processed_count = completed
         for index, batch in enumerate(batch_factory(completed), start=completed + 1):
             if index > int(total_batches):
                 raise RuntimeError("Scaler batch factory yielded too many recordings.")
@@ -257,7 +262,12 @@ class FoldChannelStandardizer:
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
+            with temporary_manifest.open("w", encoding="utf-8", newline="\\n") as handle:
+                handle.write(json.dumps(manifest, indent=2, sort_keys=True) + "\\n")
+                handle.flush()
+                os.fsync(handle.fileno())
             os.replace(temporary_manifest, manifest_path)
+            processed_count = index
 
             if index % int(progress_every) == 0 or index == int(total_batches):
                 print(
@@ -265,9 +275,9 @@ class FoldChannelStandardizer:
                     flush=True,
                 )
 
-        if completed < int(total_batches) and index != int(total_batches):
+        if processed_count != int(total_batches):
             raise RuntimeError(
-                f"Scaler batch factory ended at {index}/{total_batches} recordings."
+                f"Scaler batch factory ended at {processed_count}/{total_batches} recordings."
             )
         return self.finalize()
 
