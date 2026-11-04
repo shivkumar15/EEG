@@ -45,12 +45,44 @@ class FirstFoldRunnerRecoveryTests(unittest.TestCase):
                 train_recordings=[fit_recording],
                 validation_recordings=[validation_recording],
             )
+            def metrics(threshold):
+                return {
+                    "threshold": threshold,
+                    "sensitivity": 0.8,
+                    "specificity": 0.9,
+                    "precision": 0.7,
+                    "f1": 0.75,
+                    "f2": 0.78,
+                    "tn": 90,
+                    "fp": 10,
+                    "fn": 2,
+                    "tp": 8,
+                    "window_count": 110,
+                    "positive_windows": 10,
+                }
+
             expected_result = {
                 "experiment": "first_nested_lopo_logistic_regression",
+                "experiment_version": runner.EXPERIMENT_VERSION,
+                "result_schema_version": runner.RESULT_SCHEMA_VERSION,
+                "threshold_strategy_version": runner.THRESHOLD_STRATEGY_VERSION,
                 "status": "completed",
                 "fold_id": 1,
                 "held_out_patient": "patient_01",
-                "outer_test_metrics": {"f1": 0.75},
+                "threshold_selection": {
+                    "method": "maximize validation F1",
+                    "validation_threshold": 0.5,
+                    "outer_test_used_for_selection": False,
+                    "comparison_strategy": (
+                        "F2 threshold is selected independently on inner validation only"
+                    ),
+                    "f2_beta": 2.0,
+                    "f2_validation_threshold": 0.4,
+                },
+                "validation_metrics": metrics(0.5),
+                "outer_test_metrics": metrics(0.5),
+                "validation_metrics_f2": metrics(0.4),
+                "outer_test_metrics_f2": metrics(0.4),
             }
             output_path = root / "output" / "first_fold.json"
 
@@ -70,7 +102,7 @@ class FirstFoldRunnerRecoveryTests(unittest.TestCase):
                 context = runner._build_checkpoint_context(fold, inner_split, runner.RANDOM_STATE)
                 durable_root = (
                     root / "results" / "baselines" / "checkpoints"
-                    / "first_fold_patient_01_logistic_regression"
+                    / "first_fold_patient_01_logistic_regression_f1_f2_v1"
                 )
                 durable_store = ModelStageCheckpointStore(durable_root, context)
                 durable_store.save_scores(
@@ -102,6 +134,25 @@ class FirstFoldRunnerRecoveryTests(unittest.TestCase):
                 scaler.assert_not_called()
                 models.assert_not_called()
                 scoring.assert_not_called()
+
+
+class CompletedResultSchemaTests(unittest.TestCase):
+    def test_legacy_f1_only_summary_is_not_compatible_with_f1_f2_recovery(self):
+        fold = SimpleNamespace(fold_id=1, test_patient_id="patient_01")
+        legacy_result = {
+            "experiment": "first_nested_lopo_logistic_regression",
+            "status": "completed",
+            "fold_id": 1,
+            "held_out_patient": "patient_01",
+            "threshold_selection": {
+                "method": "maximize validation F1",
+                "validation_threshold": 0.9,
+                "outer_test_used_for_selection": False,
+            },
+        }
+        self.assertFalse(
+            runner._is_compatible_completed_result(legacy_result, fold)
+        )
 
 
 class ExistingResultSafetyGuardTests(unittest.TestCase):
