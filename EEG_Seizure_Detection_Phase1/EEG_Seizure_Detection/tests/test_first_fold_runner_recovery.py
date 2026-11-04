@@ -93,5 +93,45 @@ class FirstFoldRunnerRecoveryTests(unittest.TestCase):
                 scoring.assert_not_called()
 
 
+class ExistingResultSafetyGuardTests(unittest.TestCase):
+    def test_completed_legacy_result_without_checkpoint_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output_path = Path(temporary) / "first_fold.json"
+            output_path.write_text(
+                json.dumps({
+                    "experiment": "first_nested_lopo_logistic_regression",
+                    "status": "completed",
+                    "fold_id": 1,
+                    "held_out_patient": "patient_01",
+                }),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "no compatible durable checkpoint"):
+                runner._check_existing_completed_result(output_path)
+
+            # The safety check must never modify or delete the historical result.
+            self.assertTrue(output_path.is_file())
+            self.assertEqual(
+                json.loads(output_path.read_text(encoding="utf-8"))["status"],
+                "completed",
+            )
+
+    def test_missing_output_allows_a_new_experiment(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output_path = Path(temporary) / "not_created_yet.json"
+            runner._check_existing_completed_result(output_path)
+            self.assertFalse(output_path.exists())
+
+    def test_unreadable_existing_output_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output_path = Path(temporary) / "corrupt.json"
+            output_path.write_text("{not valid json", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "cannot be safely inspected"):
+                runner._check_existing_completed_result(output_path)
+
+
+
 if __name__ == "__main__":
     unittest.main()
