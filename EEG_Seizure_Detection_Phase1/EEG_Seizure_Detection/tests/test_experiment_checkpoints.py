@@ -30,6 +30,30 @@ class ModelStageCheckpointTests(unittest.TestCase):
                 estimator.predict_proba(X), restored.predict_proba(X)
             )
 
+    def test_completed_result_survives_working_cache_cleanup(self):
+        import shutil
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            working_cache = root / "cache" / "first_fold"
+            durable_results = root / "results" / "baselines" / "checkpoints"
+            context = {"experiment": "first_fold", "fold": 1, "seed": 42}
+
+            working_store = ModelStageCheckpointStore(
+                working_cache / "model_stages", context
+            )
+            durable_store = ModelStageCheckpointStore(durable_results, context)
+            result = {"status": "completed", "fold_id": 1, "f1": 0.75}
+
+            working_store.save_json("fold_result", result)
+            durable_store.save_json("fold_result", result)
+            shutil.rmtree(working_cache)
+
+            restored = ModelStageCheckpointStore(
+                durable_results, context
+            ).load_json("fold_result")
+            self.assertEqual(restored, result)
+
     def test_corrupt_estimator_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             store = ModelStageCheckpointStore(Path(temporary), {"fold": 1})
