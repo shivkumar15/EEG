@@ -12,7 +12,9 @@ from data_management.dataset_split import LopoFold
 from data_management.patient_mapping import Recording
 from data_management.validation_split import build_patient_validation_split
 from feature_selection.feature_extraction import FEATURE_NAMES, extract_features
-from preprocessing.normalization import (\n    FoldChannelStandardizer, scaler_checkpoint_signature,\n)
+from preprocessing.normalization import (
+    FoldChannelStandardizer, scaler_checkpoint_signature,
+)
 
 _NORMALIZATION_POLICY = "none_fold_train_only_scaling_required"
 _REQUIRED_ARRAYS = {
