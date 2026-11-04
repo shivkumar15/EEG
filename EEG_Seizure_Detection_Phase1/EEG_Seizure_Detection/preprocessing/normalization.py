@@ -258,12 +258,8 @@ class FoldChannelStandardizer:
                 "complete": index == int(total_batches),
             }
             temporary_manifest = manifest_path.with_suffix(".json.tmp")
-            temporary_manifest.write_text(
-                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            with temporary_manifest.open("w", encoding="utf-8", newline="\\n") as handle:
-                handle.write(json.dumps(manifest, indent=2, sort_keys=True) + "\\n")
+            with temporary_manifest.open("w", encoding="utf-8") as handle:
+                handle.write(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary_manifest, manifest_path)
