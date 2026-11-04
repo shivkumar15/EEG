@@ -73,26 +73,9 @@ def _recording_fingerprint(recordings):
     return values
 
 
-def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE):
-    started = perf_counter()
-    recordings = filter_primary_cohort(load_recording_manifest(audit_path))
-    folds = build_lopo_folds(recordings)
-    fold = folds[0]
-    if fold.fold_id != 1:
-        raise RuntimeError("Expected the first deterministic LOPO fold")
-
-    print(f"Primary cohort: {len(recordings)} recordings", flush=True)
-    print(f"Outer fold {fold.fold_id}: held-out patient {fold.test_patient_id}", flush=True)
-    cache_root = PROJECT_ROOT / "cache" / "first_fold"
-    persistent_checkpoint_root = (
-        PROJECT_ROOT / "results" / "baselines" / "checkpoints"
-        / "first_fold_patient_01_logistic_regression"
-    )
-    # Build the deterministic patient split without fitting/loading the scaler.
-    inner_split = build_patient_validation_split(
-        fold.train_recordings, validation_fraction=0.2, random_state=seed
-    )
-    checkpoint_context = {
+def _build_checkpoint_context(fold, inner_split, seed: int) -> dict:
+    """Build the exact data/model signature used by durable and stage checkpoints."""
+    return {
         "experiment": "first_nested_lopo_logistic_regression",
         "checkpoint_version": 1,
         "feature_pipeline_version": 1,
@@ -113,6 +96,28 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
             "feature_names": list(FEATURE_NAMES),
         },
     }
+
+
+def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE):
+    started = perf_counter()
+    recordings = filter_primary_cohort(load_recording_manifest(audit_path))
+    folds = build_lopo_folds(recordings)
+    fold = folds[0]
+    if fold.fold_id != 1:
+        raise RuntimeError("Expected the first deterministic LOPO fold")
+
+    print(f"Primary cohort: {len(recordings)} recordings", flush=True)
+    print(f"Outer fold {fold.fold_id}: held-out patient {fold.test_patient_id}", flush=True)
+    cache_root = PROJECT_ROOT / "cache" / "first_fold"
+    persistent_checkpoint_root = (
+        PROJECT_ROOT / "results" / "baselines" / "checkpoints"
+        / "first_fold_patient_01_logistic_regression"
+    )
+    # Build the deterministic patient split without fitting/loading the scaler.
+    inner_split = build_patient_validation_split(
+        fold.train_recordings, validation_fraction=0.2, random_state=seed
+    )
+    checkpoint_context = _build_checkpoint_context(fold, inner_split, seed)
     # Check durable completed results before scaler fitting or feature extraction.
     completed_store = ModelStageCheckpointStore(
         persistent_checkpoint_root, checkpoint_context
