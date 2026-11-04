@@ -30,9 +30,11 @@ For every future training pipeline, assess and checkpoint the following expensiv
 
 ## Current implementation scope (Fold 1 baseline)
 
-The first-fold runner currently supports per-recording feature extraction checkpoints through disk-backed NumPy arrays and an atomic manifest. Completed feature recordings can be reused after interruption when the cache signature matches.
+The first-fold runner supports per-recording feature extraction checkpoints through disk-backed NumPy arrays and an atomic manifest. Completed feature recordings can be reused after interruption when the cache signature matches.
 
-**Important limitation:** estimator fitting itself is not checkpointed. If interrupted during Logistic Regression or Random Forest fitting, that fit must currently be repeated. The feature cache remains reusable. The runner currently handles the first LOPO fold only; it is not yet a resumable 23-fold experiment runner.
+Fold-specific channel-scaler fitting now supports per-recording checkpoints of the running sample count, channel mean and M2 accumulator. The scaler checkpoint signature binds the exact ordered recordings, patient/fold context, processed NPZ source fingerprints, algorithm version and epsilon. The manifest advances only after a complete recording's accumulator state has been flushed and atomically stored. Inner-fit and outer-training scaler contexts use separate checkpoint directories.
+
+**Important limitations:** estimator fitting itself is not checkpointed. If interrupted during Logistic Regression or Random Forest fitting, that fit must currently be repeated; compatible scaler and feature caches remain reusable. Validation scoring/threshold selection and final test scoring are not independently checkpointed. The runner currently handles the first LOPO fold only; it is not yet a resumable 23-fold experiment runner. See `docs/SCALER_CHECKPOINTS.md` for the scaler checkpoint format and validation coverage.
 
 Do not claim full end-to-end resume until model-fitting recovery and fold-level recovery have been implemented and tested.
 
