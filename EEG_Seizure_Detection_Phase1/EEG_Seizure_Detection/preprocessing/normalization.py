@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -222,7 +223,7 @@ class FoldChannelStandardizer:
                     f"{completed}/{total_batches} recordings",
                     flush=True,
                 )
-            except (OSError, EOFError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+            except (OSError, EOFError, ValueError, TypeError, KeyError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
                 print(
                     f"    rejecting invalid scaler checkpoint ({exc}); restarting scaler fit",
                     flush=True,
