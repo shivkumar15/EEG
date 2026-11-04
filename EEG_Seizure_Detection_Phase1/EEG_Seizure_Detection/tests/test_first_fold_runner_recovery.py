@@ -2,6 +2,8 @@
 import json
 import tempfile
 import unittest
+
+import numpy as np
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -70,9 +72,18 @@ class FirstFoldRunnerRecoveryTests(unittest.TestCase):
                     root / "results" / "baselines" / "checkpoints"
                     / "first_fold_patient_01_logistic_regression"
                 )
-                ModelStageCheckpointStore(durable_root, context).save_json(
-                    "fold_result", expected_result
+                durable_store = ModelStageCheckpointStore(durable_root, context)
+                durable_store.save_scores(
+                    "inner_validation_scores",
+                    np.array([0, 1], dtype=np.int8),
+                    np.array([0.2, 0.8], dtype=np.float64),
                 )
+                durable_store.save_scores(
+                    "outer_test_scores",
+                    np.array([0, 1], dtype=np.int8),
+                    np.array([0.3, 0.7], dtype=np.float64),
+                )
+                durable_store.save_json("fold_result", expected_result)
 
                 with (
                     patch.object(runner, "prepare_lopo_fold", side_effect=AssertionError("fold preparation must be skipped")) as prepare,
