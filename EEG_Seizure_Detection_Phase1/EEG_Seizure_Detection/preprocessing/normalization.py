@@ -181,6 +181,10 @@ class FoldChannelStandardizer:
             raise ValueError("total_batches must be positive.")
         if not signature:
             raise ValueError("A non-empty scaler checkpoint signature is required.")
+        if int(progress_every) <= 0:
+            raise ValueError("progress_every must be positive.")
+        if self._count or self.mean_ is not None:
+            raise RuntimeError("Checkpointed fitting requires a fresh, unfitted scaler.")
 
         root = Path(checkpoint_dir)
         root.mkdir(parents=True, exist_ok=True)
@@ -218,7 +222,7 @@ class FoldChannelStandardizer:
                     f"{completed}/{total_batches} recordings",
                     flush=True,
                 )
-            except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+            except (OSError, EOFError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
                 print(
                     f"    rejecting invalid scaler checkpoint ({exc}); restarting scaler fit",
                     flush=True,
