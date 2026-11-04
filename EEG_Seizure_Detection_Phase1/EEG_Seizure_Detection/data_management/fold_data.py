@@ -144,6 +144,7 @@ def prepare_lopo_fold(
     processed_dir: str | Path,
     validation_fraction: float = 0.2,
     random_state: int = 42,
+    scaler_checkpoint_dir: str | Path | None = None,
 ) -> PreparedFold:
     """Split outer-training patients, then fit scaler on inner-fit recordings only."""
     train_patients = {item.patient_id for item in fold.train_recordings}
