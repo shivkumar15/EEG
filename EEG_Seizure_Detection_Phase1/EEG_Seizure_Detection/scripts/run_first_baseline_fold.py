@@ -23,6 +23,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+RESULT_SCHEMA_VERSION = 2
+THRESHOLD_STRATEGY_VERSION = "validation_f1_and_f2_v1"
+EXPERIMENT_VERSION = "nested_lopo_lr_f1_f2_v1"
+
 from config import PROCESSED_DIR, PREFERRED_CHANNELS, RANDOM_STATE
 from data_management.cohort import filter_primary_cohort
 from data_management.dataset_split import build_lopo_folds
@@ -89,6 +93,66 @@ def _check_existing_completed_result(output_path: Path) -> None:
         )
 
 
+def _is_compatible_completed_result(result: dict, fold) -> bool:
+    """Reject stale or incomplete summaries before reusing durable results."""
+    if not isinstance(result, dict):
+        return False
+    if (
+        result.get("experiment") != "first_nested_lopo_logistic_regression"
+        or result.get("experiment_version") != EXPERIMENT_VERSION
+        or result.get("result_schema_version") != RESULT_SCHEMA_VERSION
+        or result.get("threshold_strategy_version") != THRESHOLD_STRATEGY_VERSION
+        or result.get("status") != "completed"
+        or result.get("fold_id") != fold.fold_id
+        or result.get("held_out_patient") != fold.test_patient_id
+    ):
+        return False
+
+    selection = result.get("threshold_selection")
+    if not isinstance(selection, dict):
+        return False
+    if (
+        selection.get("method") != "maximize validation F1"
+        or selection.get("outer_test_used_for_selection") is not False
+        or selection.get("f2_beta") != 2.0
+        or selection.get("comparison_strategy")
+        != "F2 threshold is selected independently on inner validation only"
+    ):
+        return False
+
+    try:
+        f1_threshold = float(selection["validation_threshold"])
+        f2_threshold = float(selection["f2_validation_threshold"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    if not np.isfinite([f1_threshold, f2_threshold]).all():
+        return False
+
+    metric_keys = {
+        "threshold", "sensitivity", "specificity", "precision", "f1", "f2",
+        "tn", "fp", "fn", "tp", "window_count", "positive_windows",
+    }
+    metric_thresholds = {
+        "validation_metrics": f1_threshold,
+        "outer_test_metrics": f1_threshold,
+        "validation_metrics_f2": f2_threshold,
+        "outer_test_metrics_f2": f2_threshold,
+    }
+    for name, expected_threshold in metric_thresholds.items():
+        metrics = result.get(name)
+        if not isinstance(metrics, dict) or not metric_keys.issubset(metrics):
+            return False
+        try:
+            actual_threshold = float(metrics["threshold"])
+        except (TypeError, ValueError):
+            return False
+        if not np.isfinite(actual_threshold) or not np.isclose(
+            actual_threshold, expected_threshold, rtol=0.0, atol=1e-12
+        ):
+            return False
+    return True
+
+
 def _recording_fingerprint(recordings):
     values = []
     for item in recordings:
@@ -109,6 +173,10 @@ def _build_checkpoint_context(fold, inner_split, seed: int) -> dict:
     """Build the exact data/model signature used by durable and stage checkpoints."""
     return {
         "experiment": "first_nested_lopo_logistic_regression",
+        "experiment_version": EXPERIMENT_VERSION,
+        "result_schema_version": RESULT_SCHEMA_VERSION,
+        "threshold_strategy_version": THRESHOLD_STRATEGY_VERSION,
+        "checkpoint_context_schema_version": 2,
         "checkpoint_version": 1,
         "feature_pipeline_version": 1,
         "channel_normalization_version": 1,
@@ -143,7 +211,7 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     cache_root = PROJECT_ROOT / "cache" / "first_fold"
     persistent_checkpoint_root = (
         PROJECT_ROOT / "results" / "baselines" / "checkpoints"
-        / "first_fold_patient_01_logistic_regression"
+        / "first_fold_patient_01_logistic_regression_f1_f2_v1"
     )
     # Build the deterministic patient split without fitting/loading the scaler.
     inner_split = build_patient_validation_split(
@@ -156,8 +224,14 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     )
     completed_result = completed_store.load_json("fold_result")
     if completed_result is not None and completed_result.get("status") == "completed":
-        # A completed result is only considered fully reusable when its score
-        # artifacts are also present and signature/checksum-valid.
+        if not _is_compatible_completed_result(completed_result, fold):
+            raise RuntimeError(
+                "A completed durable result has an incompatible or incomplete "
+                "experiment/result schema. Preserve it; do not reuse it as the "
+                "current F1/F2 experiment."
+            )
+        # A completed result is only reusable when both score artifacts are
+        # present and signature/checksum-valid.
         if (completed_store.load_scores("inner_validation_scores") is None
                 or completed_store.load_scores("outer_test_scores") is None):
             raise RuntimeError(
@@ -174,7 +248,7 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     _check_existing_completed_result(output_path)
 
     stage_store = ModelStageCheckpointStore(
-        cache_root / "model_stages" / "fold_1_logistic_regression",
+        cache_root / "model_stages" / "fold_1_logistic_regression_f1_f2_v1",
         checkpoint_context,
     )
     print("Preparing inner fit/validation split and fit-only channel scaler...", flush=True)
@@ -307,6 +381,9 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
 
     result = {
         "experiment": "first_nested_lopo_logistic_regression",
+        "experiment_version": EXPERIMENT_VERSION,
+        "result_schema_version": RESULT_SCHEMA_VERSION,
+        "threshold_strategy_version": THRESHOLD_STRATEGY_VERSION,
         "status": "completed",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "fold_id": fold.fold_id,
@@ -388,7 +465,7 @@ def main():
     parser.add_argument(
         "--output",
         type=Path,
-        default=PROJECT_ROOT / "results" / "baselines" / "first_fold_patient_01.json",
+        default=PROJECT_ROOT / "results" / "baselines" / "first_fold_patient_01_f1_f2_v1.json",
         help="JSON output path for this experiment",
     )
     parser.add_argument("--seed", type=int, default=RANDOM_STATE)
