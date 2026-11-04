@@ -91,6 +91,8 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     checkpoint_context = {
         "experiment": "first_nested_lopo_logistic_regression",
         "checkpoint_version": 1,
+        "feature_pipeline_version": 1,
+        "channel_normalization_version": 1,
         "fold_id": fold.fold_id,
         "held_out_patient": fold.test_patient_id,
         "random_state": int(seed),
@@ -115,6 +117,8 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     if completed_result is not None and completed_result.get("status") == "completed":
         _write_result(output_path, completed_result)
         print(f"Recovered completed fold result: {output_path}", flush=True)
+        if cache_root.exists():
+            shutil.rmtree(cache_root)
         return completed_result
 
     print("Extracting/resuming inner-fit features...", flush=True)
