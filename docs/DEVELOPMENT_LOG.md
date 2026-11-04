@@ -119,3 +119,12 @@ Current milestone: **4.1 — feature extraction and scientific validation**.
 #### Next milestone
 - Review and freeze feature definitions, then implement the baseline training/evaluation workflow using the patient-wise nested folds and recording-at-a-time feature iterator.
 - Do not randomly split overlapping windows. Hyperparameter selection must remain inside inner fit/validation patients; outer-test patients are reserved for final fold evaluation.
+
+
+## 2026-11-04 — Documentation reconciliation
+
+- Reconciled `docs/PROJECT_MASTER_PLAN.md`, `docs/CURRENT_STATUS.md` and `docs/AI_HANDOFF.md` with the current 683-recording, 23-patient research cohort and Phase 4.5.2 checkpoint implementation.
+- Clarified the distinction between completed data/split/feature infrastructure and pending real-EEG model evaluation.
+- Recorded that model-stage compile, focused tests, full regression tests and controlled runner interruption/restart verification still require confirmation from the user's local environment.
+- Corrected the handoff instructions to use the repository-root `.venv311` Python 3.11 environment and run tests from the nested `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection` directory.
+- No model training was started and no experiment metrics were added.
