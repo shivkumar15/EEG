@@ -54,12 +54,12 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
 
     print(f"Primary cohort: {len(recordings)} recordings", flush=True)
     print(f"Outer fold {fold.fold_id}: held-out patient {fold.test_patient_id}", flush=True)
+    cache_root = PROJECT_ROOT / "cache" / "first_fold"
     print("Preparing inner fit/validation split and fit-only channel scaler...", flush=True)
     prepared = prepare_lopo_fold(
-        fold, PROCESSED_DIR, validation_fraction=0.2, random_state=seed
+        fold, PROCESSED_DIR, validation_fraction=0.2, random_state=seed,
+        scaler_checkpoint_dir=cache_root / "scalers" / "fold_1_inner_fit",
     )
-
-    cache_root = PROJECT_ROOT / "cache" / "first_fold"
     print("Extracting/resuming inner-fit features...", flush=True)
     fit_batch = collect_features(
         prepared.fit_recordings, PROCESSED_DIR, prepared.standardizer,
@@ -87,7 +87,18 @@ def run_first_fold(audit_path: Path, output_path: Path, seed: int = RANDOM_STATE
     gc.collect()
 
     print("Refitting channel scaler on all outer-training patients...", flush=True)
-    outer_scaler = fit_channel_standardizer(fold.train_recordings, PROCESSED_DIR)
+    outer_scaler = fit_channel_standardizer(
+        fold.train_recordings,
+        PROCESSED_DIR,
+        checkpoint_dir=cache_root / "scalers" / "fold_1_outer_train",
+        checkpoint_context={
+            "stage": "outer_train_channel_scaler",
+            "fold_id": fold.fold_id,
+            "outer_test_patient": fold.test_patient_id,
+            "outer_train_patients": sorted({item.patient_id for item in fold.train_recordings}),
+            "random_state": int(seed),
+        },
+    )
 
     print("Extracting all outer-training features...", flush=True)
     outer_train_batch = collect_features(
