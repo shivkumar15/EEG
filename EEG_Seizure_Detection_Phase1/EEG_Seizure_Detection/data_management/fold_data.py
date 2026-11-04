@@ -12,7 +12,7 @@ from data_management.dataset_split import LopoFold
 from data_management.patient_mapping import Recording
 from data_management.validation_split import build_patient_validation_split
 from feature_selection.feature_extraction import FEATURE_NAMES, extract_features
-from preprocessing.normalization import FoldChannelStandardizer
+from preprocessing.normalization import (\n    FoldChannelStandardizer, scaler_checkpoint_signature,\n)
 
 _NORMALIZATION_POLICY = "none_fold_train_only_scaling_required"
 _REQUIRED_ARRAYS = {
@@ -164,11 +164,32 @@ def prepare_lopo_fold(
     directory = Path(processed_dir)
     scaler = FoldChannelStandardizer()
 
-    def training_batches():
-        for recording in inner.train_recordings:
+    def training_batches(start_index=0):
+        for recording in inner.train_recordings[start_index:]:
             yield load_recording_windows(directory, recording).X
 
-    scaler.fit_batches(training_batches())
+    if scaler_checkpoint_dir is None:
+        scaler.fit_batches(training_batches())
+    else:
+        checkpoint_context = {
+            "stage": "inner_fit_channel_scaler",
+            "fold_id": fold.fold_id,
+            "outer_test_patient": fold.test_patient_id,
+            "inner_fit_patients": sorted(fit_patients),
+            "inner_validation_patients": sorted(validation_patients),
+            "random_state": int(random_state),
+            "validation_fraction": float(validation_fraction),
+        }
+        signature = scaler_checkpoint_signature(
+            inner.train_recordings, directory, checkpoint_context, scaler.epsilon
+        )
+        scaler.fit_batches_checkpointed(
+            training_batches,
+            total_batches=len(inner.train_recordings),
+            checkpoint_dir=scaler_checkpoint_dir,
+            signature=signature,
+            progress_label="inner-fit channel-scaler fit",
+        )
     return PreparedFold(
         fold.fold_id, fold.test_patient_id,
         inner.train_recordings, inner.validation_recordings,
