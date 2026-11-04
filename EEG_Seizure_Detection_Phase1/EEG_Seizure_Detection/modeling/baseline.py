@@ -27,7 +27,9 @@ from data_management.fold_data import load_recording_windows
 from config import PREFERRED_CHANNELS
 from data_management.patient_mapping import Recording
 from feature_selection.feature_extraction import FEATURE_NAMES, extract_features
-from preprocessing.normalization import (\n    FoldChannelStandardizer, scaler_checkpoint_signature,\n)
+from preprocessing.normalization import (
+    FoldChannelStandardizer, scaler_checkpoint_signature,
+)
 
 
 @dataclass(frozen=True, slots=True)
