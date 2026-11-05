@@ -75,7 +75,7 @@ class FirstFoldEventEvaluationTests(unittest.TestCase):
         events = [{
             "event_index": 1,
             "seizure_start_seconds": 10.0,
-            "seizure_end_seconds": 15.0,
+            "seizure_end_seconds": 20.0,
             "detected": False,
         }]
         starts = np.asarray([0.0, 5.0, 10.0, 15.0, 20.0, 40.0])
@@ -84,7 +84,7 @@ class FirstFoldEventEvaluationTests(unittest.TestCase):
             events, starts, scores, threshold=0.5, window_seconds=10.0
         )
         event = events[0]
-        self.assertEqual(event["overlapping_window_count"], 2)
+        self.assertEqual(event["overlapping_window_count"], 3)
         self.assertAlmostEqual(event["max_overlapping_window_score"], 0.4)
         self.assertAlmostEqual(event["max_score_minus_threshold"], -0.1)
         self.assertEqual(event["top_scoring_window_start_seconds"], 15.0)
