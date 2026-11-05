@@ -186,13 +186,33 @@ def evaluate_recording_events(
 
     detected_delays: list[float] = []
     missed_events = 0
-    for event in seizures:
+    event_details: list[dict] = []
+    for event_index, event in enumerate(seizures, start=1):
         matching = [alarm for alarm in alarms if _overlaps(alarm, event)]
         if not matching:
             missed_events += 1
+            event_details.append({
+                "event_index": event_index,
+                "seizure_start_seconds": float(event.start),
+                "seizure_end_seconds": float(event.end),
+                "detected": False,
+                "first_alarm_start_seconds": None,
+                "detection_delay_seconds": None,
+                "matching_alarm_count": 0,
+            })
             continue
         first_alarm = min(matching, key=lambda alarm: alarm.start)
-        detected_delays.append(max(0.0, first_alarm.start - event.start))
+        delay = max(0.0, first_alarm.start - event.start)
+        detected_delays.append(delay)
+        event_details.append({
+            "event_index": event_index,
+            "seizure_start_seconds": float(event.start),
+            "seizure_end_seconds": float(event.end),
+            "detected": True,
+            "first_alarm_start_seconds": float(first_alarm.start),
+            "detection_delay_seconds": float(delay),
+            "matching_alarm_count": len(matching),
+        })
 
     false_alarm_count = sum(
         not any(_overlaps(alarm, event) for event in seizures)
@@ -228,6 +248,7 @@ def evaluate_recording_events(
             if non_seizure_seconds is not None and non_seizure_seconds > 0
             else None
         ),
+        "events": event_details,
         "alarms": [asdict(alarm) for alarm in alarms],
     }
 
