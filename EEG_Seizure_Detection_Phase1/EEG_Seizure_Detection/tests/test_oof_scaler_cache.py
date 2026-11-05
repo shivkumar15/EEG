@@ -73,3 +73,36 @@ def test_statistics_reject_non_finite_values():
 def test_recompute_rejects_invalid_scaler():
     with pytest.raises(ValueError, match="positive"):
         recompute_log_std_features(np.ones((1, 2, 8)), np.zeros(2), np.zeros(2))
+
+
+def test_cached_raw_std_reconstructs_fold_log_std_with_small_float32_error():
+    from evaluation.oof_scaler_cache import (
+        log_std_from_raw_standard_deviations,
+        window_channel_standard_deviations,
+    )
+    from feature_selection.robust_feature_extraction import extract_robust_features
+    rng = np.random.default_rng(912)
+    windows = rng.normal(size=(7, 3, 512)).astype(np.float32)
+    windows[0, 0] = 0.0
+    mean = np.array([0.2, -0.1, 0.4])
+    scale = np.array([0.5, 2.0, 1.5])
+    raw_std = window_channel_standard_deviations(windows, chunk_size=2)
+    actual = log_std_from_raw_standard_deviations(raw_std, scale)
+    standardized = ((windows.astype(np.float64) - mean[None, :, None])
+                    / scale[None, :, None]).astype(np.float32)
+    expected = extract_robust_features(standardized, 128)[:, 0::10]
+    np.testing.assert_allclose(actual, expected, rtol=2e-5, atol=2e-5)
+    assert np.isfinite(actual).all()
+
+
+def test_raw_std_cache_rejects_non_finite_and_invalid_scale():
+    from evaluation.oof_scaler_cache import (
+        log_std_from_raw_standard_deviations,
+        window_channel_standard_deviations,
+    )
+    windows = np.ones((2, 2, 128), dtype=np.float32)
+    windows[0, 0, 0] = np.inf
+    with pytest.raises(ValueError, match="non-finite"):
+        window_channel_standard_deviations(windows)
+    with pytest.raises(ValueError, match="positive"):
+        log_std_from_raw_standard_deviations(np.ones((2, 2)), np.array([1.0, 0.0]))
