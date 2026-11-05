@@ -104,7 +104,49 @@ def prepare_base_rows(robust_root, outer_train):
         "validation_cache_signature": val_m.get("signature"),
         "ordered_recordings": [r.relative_path for r in outer_train],
     })
-    return row_lookup, base_signature
+    return row_lookup, base_signature, split
+
+
+def audit_raw_std_approximation(robust_root, std_root, std_manifest, row_lookup, validation_recordings):
+    """Compare raw-std reconstruction with cached real validation log_std values."""
+    checkpoint = robust_root / "scaler_checkpoint"
+    checkpoint_manifest = json.loads((checkpoint / "manifest.json").read_text(encoding="utf-8"))
+    if not checkpoint_manifest.get("complete"):
+        raise RuntimeError("Original inner-fit scaler checkpoint is incomplete")
+    state_name = checkpoint_manifest.get("state_file")
+    if not isinstance(state_name, str) or Path(state_name).name != state_name:
+        raise RuntimeError("Invalid original scaler checkpoint state filename")
+    with np.load(checkpoint / state_name, allow_pickle=False) as saved:
+        state = {"count": int(saved["count"]), "mean": saved["mean"], "m2": saved["m2"]}
+    _, original_scale = finalize_channel_statistics(state)
+    entries = {e["relative_path"]: e for e in std_manifest["entries"]}
+    columns = np.arange(len(PREFERRED_CHANNELS)) * FEATURES_PER_CHANNEL
+    max_error, mismatch_count, floor_mismatches, checked = 0.0, 0, 0, 0
+    floor = float(np.log(1e-12))
+    for rec in validation_recordings:
+        source_x, _, start, end = row_lookup[rec.relative_path]
+        entry = entries[rec.relative_path]
+        with np.load(std_root / "recordings" / entry["artifact"], allow_pickle=False) as saved:
+            raw_std = saved["std"]
+            if str(saved["signature"].item()) != entry["signature"]:
+                raise RuntimeError(f"Raw-std signature mismatch during numerical audit: {rec.relative_path}")
+            reconstructed = log_std_from_raw_standard_deviations(raw_std, original_scale)
+        actual = np.asarray(source_x[start:end, :][:, columns], dtype=np.float32)
+        if reconstructed.shape != actual.shape:
+            raise RuntimeError(f"Raw-std numerical audit shape mismatch: {rec.relative_path}")
+        delta = np.abs(reconstructed - actual)
+        max_error = max(max_error, float(np.max(delta)))
+        mismatch_count += int(np.count_nonzero(delta > 5e-4))
+        actual_floor = actual <= floor + 1e-6
+        reconstructed_floor = reconstructed <= floor + 1e-6
+        floor_mismatches += int(np.count_nonzero(actual_floor != reconstructed_floor))
+        checked += int(actual.size)
+    print(f"Raw-std real-cache audit: {checked:,} values; max_abs_error={max_error:.8g}; "
+          f"over_tolerance={mismatch_count}; floor_mismatches={floor_mismatches}", flush=True)
+    if mismatch_count or floor_mismatches:
+        raise RuntimeError("Raw-std approximation failed real validation-cache audit; refusing OOF training")
+    return {"checked_values": checked, "max_absolute_error": max_error,
+            "values_over_tolerance": mismatch_count, "floor_mismatches": floor_mismatches}
 
 
 def aggregate_patient_statistics(stats_root, manifest, outer_train):
@@ -314,13 +356,16 @@ def run(audit, seed=RANDOM_STATE):
     if stats_manifest.get("excluded_outer_test_patient") != "patient_01" or std_manifest.get("excluded_outer_test_patient") != "patient_01":
         raise RuntimeError("A prerequisite cache did not exclude patient_01")
 
-    row_lookup, base_signature = prepare_base_rows(robust_root, outer.train_recordings)
+    row_lookup, base_signature, inner_split = prepare_base_rows(robust_root, outer.train_recordings)
     patient_states, stats_entries = aggregate_patient_statistics(stats_root, stats_manifest, outer.train_recordings)
     std_paths = {e["relative_path"] for e in std_manifest["entries"]}
     if std_paths != {r.relative_path for r in outer.train_recordings}:
         raise RuntimeError("Raw window-std cache does not match outer training")
     if std_manifest.get("recording_count") != 608 or stats_manifest.get("recording_count") != 608:
         raise RuntimeError("Expected 608 recordings in both OOF caches")
+    numerical_audit = audit_raw_std_approximation(
+        robust_root, std_root, std_manifest, row_lookup, inner_split.validation_recordings
+    )
 
     output = cache_root / "oof_patient_scores_v1"
     fold_dir = output / "folds"
@@ -399,6 +444,7 @@ def run(audit, seed=RANDOM_STATE):
               "outer_test_patient_excluded": "patient_01", "patient_fold_count": 22,
               "window_count": len(pooled_y), "positive_windows": int(np.sum(pooled_y == 1)),
               "model": "LogisticRegression(solver=liblinear,class_weight=balanced,max_iter=1000)",
+              "raw_std_real_cache_audit": numerical_audit,
               "threshold": {"value": threshold, "objective": "pooled OOF window F2",
                             "status": "provisional; event-level metrics and fold calibration review required"},
               "pooled_metrics_at_oof_f2_threshold": pooled_metrics, "patient_folds": results,
