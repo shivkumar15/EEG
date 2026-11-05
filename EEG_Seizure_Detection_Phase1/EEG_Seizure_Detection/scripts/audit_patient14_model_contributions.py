@@ -318,13 +318,9 @@ def run(audit_path: Path) -> dict:
 
     print(f"Reconstruction max probability difference: {max_score_error:.8g}", flush=True)
     print(f"Saved {json_path.relative_to(ROOT)}", flush=True)
-    # Remove the temporary fold matrix after a successful diagnostic.
-    for filename in ("X.npy", "y.npy", "manifest.json", "progress.json"):
-        (work_folder / filename).unlink(missing_ok=True)
-    try:
-        work_folder.rmdir()
-    except OSError:
-        pass
+    # Keep the completed fold feature matrix on disk. NumPy memmaps can retain
+    # Windows file handles until all references are released; retaining this
+    # resumable cache is safer than deleting it during process teardown.
     print("OOF score artifact unchanged; threshold not tuned; patient_01 not loaded.", flush=True)
     return result
 
