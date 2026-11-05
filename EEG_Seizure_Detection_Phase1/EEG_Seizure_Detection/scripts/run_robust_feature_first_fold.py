@@ -118,6 +118,11 @@ def collect_robust_batch(recordings, split_name: str, scaler, cache_root: Path) 
             completed, cursor = 0, 0
 
     if X is None:
+        # Release any rejected mappings before replacing cache files (Windows-safe).
+        if "candidate_x" in locals():
+            del candidate_x
+        if "candidate_y" in locals():
+            del candidate_y
         X = np.lib.format.open_memmap(x_path, mode="w+", dtype=np.float32,
                                       shape=(total_windows, feature_count))
         y = np.lib.format.open_memmap(y_path, mode="w+", dtype=np.int8,
