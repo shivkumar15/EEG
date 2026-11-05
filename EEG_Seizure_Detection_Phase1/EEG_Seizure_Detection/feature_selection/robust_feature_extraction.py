@@ -29,6 +29,12 @@ def extract_robust_features(windows: np.ndarray, sfreq: float) -> np.ndarray:
         raise ValueError("EEG windows contain NaN or infinite values.")
     if not np.isscalar(sfreq) or not np.isfinite(sfreq) or sfreq < 80:
         raise ValueError("Sampling frequency must be finite and at least 80 Hz.")
+    minimum_samples = int(np.ceil(2.0 * float(sfreq)))
+    if values.shape[-1] < minimum_samples:
+        raise ValueError(
+            f"Each window must contain at least 2 seconds of EEG "
+            f"({minimum_samples} samples at {sfreq} Hz)."
+        )
 
     eps = np.finfo(np.float64).eps
     centered = values - np.mean(values, axis=-1, keepdims=True)
