@@ -146,6 +146,30 @@ class EventMetricTests(unittest.TestCase):
         self.assertIsNone(combined["non_seizure_duration_seconds"])
         self.assertIsNone(combined["false_alarms_per_hour"])
 
+    def test_returns_per_event_detection_details_and_delay(self):
+        result = evaluate_recording_events(
+            [0, 5, 10, 15, 20], [0, 1, 0, 0, 0],
+            [(6, 9), (16, 19)], recording_duration_seconds=25,
+            window_seconds=5,
+        )
+        self.assertEqual(len(result["events"]), 2)
+        self.assertTrue(result["events"][0]["detected"])
+        self.assertEqual(result["events"][0]["detection_delay_seconds"], 0.0)
+        self.assertFalse(result["events"][1]["detected"])
+        self.assertIsNone(result["events"][1]["detection_delay_seconds"])
+
+    def test_per_event_details_preserve_chronological_indices(self):
+        result = evaluate_recording_events(
+            [0, 5, 10, 15], [0, 0, 1, 0],
+            [(1, 3), (11, 14)], recording_duration_seconds=20,
+            window_seconds=5,
+        )
+        self.assertEqual(
+            [item["event_index"] for item in result["events"]], [1, 2]
+        )
+        self.assertFalse(result["events"][0]["detected"])
+        self.assertTrue(result["events"][1]["detected"])
+
 
 if __name__ == "__main__":
     unittest.main()
