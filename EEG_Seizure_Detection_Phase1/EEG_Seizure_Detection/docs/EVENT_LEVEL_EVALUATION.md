@@ -103,3 +103,13 @@ overlapping alarm start, detection delay, and number of matching alarms.
 Missed events have null first-alarm and delay fields. This allows the team to
 identify exactly which seizure annotations were missed or detected late,
 rather than relying only on one aggregate sensitivity value.
+
+
+Each event record also includes score diagnostics calculated from saved model
+scores: number of windows overlapping the annotated event, maximum and median
+overlapping-window scores, start time of the highest-scoring overlapping
+window, maximum-score margin relative to the selected threshold, and maximum
+score in a 30-second context on each side. These values distinguish a
+near-threshold miss from an event for which the model assigned uniformly low
+scores. Context scores are descriptive only and are not used to change the
+threshold or evaluate/tune the model.
