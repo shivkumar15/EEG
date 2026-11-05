@@ -371,7 +371,7 @@ def train_score_fold(heldout, fold_index, X, y, offsets, output, seed):
     return fold_y, scores, recording_offsets
 
 
-def run(audit, seed=RANDOM_STATE):
+def run(audit, seed=RANDOM_STATE, audit_only=False):
     recordings = filter_primary_cohort(load_recording_manifest(audit))
     outer = build_lopo_folds(recordings)[0]
     if outer.test_patient_id != "patient_01" or len(outer.train_recordings) != 608:
@@ -398,6 +398,9 @@ def run(audit, seed=RANDOM_STATE):
     numerical_audit = audit_raw_std_approximation(
         robust_root, std_root, std_manifest, row_lookup, inner_split.validation_recordings
     )
+    if audit_only:
+        print("Numerical audit passed. Audit-only mode: no OOF models were trained.", flush=True)
+        return {"status": "audit_passed", "numerical_audit": numerical_audit}
 
     output = cache_root / "oof_patient_scores_v1"
     fold_dir = output / "folds"
@@ -498,8 +501,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--audit", type=Path, default=ROOT.parent.parent / "docs" / "full_annotation_audit.csv")
     parser.add_argument("--seed", type=int, default=RANDOM_STATE)
+    parser.add_argument(
+        "--audit-only", action="store_true",
+        help="Run cache and numerical integrity checks without training OOF models.",
+    )
     args = parser.parse_args()
-    run(args.audit, args.seed)
+    run(args.audit, args.seed, audit_only=args.audit_only)
 
 
 if __name__ == "__main__":
