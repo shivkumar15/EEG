@@ -3,7 +3,7 @@
 **Working repository:** https://github.com/shivkumar15/EEG  
 **Original source repository:** https://github.com/student-anshu/EEG-seizure-detection  
 **Current development stage:** Phase 4 — baseline model workflow and recovery engineering.  
-**Active branch:** `feature/model-stage-checkpoints`
+**Active branch:** `feature/threshold-strategy-score-artifacts`
 
 ## 1. Research objective
 
@@ -135,7 +135,7 @@ Do not claim end-to-end 23-fold resumability until fold scheduling, durable fold
 - Phase 4.2: fold-wise feature integration.
 - Phase 4.3: baseline utilities and first-fold preflight.
 - Phase 4.5.1: scaler checkpoint implementation and focused local tests previously reported as passing.
-- Phase 4.5.2: model-stage checkpoint implementation and documentation are present on the active branch; current local compile, focused test, full-suite and controlled runner-recovery verification are pending confirmation.
+- Phase 4.5.2: model-stage checkpoint implementation and documentation are present on the active branch. On 5 November 2026, the user reported 136 tests and 4 subtests passing in 3.95 seconds (4 skipped); robust-feature focused tests passed 6/6 in 1.20 seconds. These results confirm the repository regression suite, not an actual long-running interruption/restart. Controlled runner-recovery verification remains pending.
 
 ### In progress
 - Verify the current model-stage checkpoint branch using Python 3.11 environment and the correct nested project directory.
