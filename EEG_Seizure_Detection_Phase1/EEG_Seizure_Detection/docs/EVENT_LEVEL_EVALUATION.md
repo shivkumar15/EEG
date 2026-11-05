@@ -29,17 +29,14 @@ alarm system.
 
 ## Exact recording duration is mandatory
 
-The existing processed NPZ format stores window starts and samples per window,
-but does not store the full original EDF duration. The last complete window
-end is only a lower bound on recording duration because a trailing partial
-window may exist. Do **not** use that lower bound as the false-alarm-rate
-denominator.
-
-The event evaluator therefore requires `recording_duration_seconds` explicitly.
-Before running it on real cohort results, update preprocessing to persist the
-original duration (`raw.n_times / sfreq`) and add backward-compatible loading
-and integrity tests. Existing processed recordings should be backfilled from
-their EDF headers or reprocessed; do not silently approximate duration.
+Newly processed NPZ files now persist `recording_duration_seconds` from the
+actual loaded signal sample count divided by sampling frequency, and the
+metadata CSV repeats this value for integrity checks. The event evaluator
+requires `recording_duration_seconds` explicitly. The 683 existing processed
+NPZ files predate this field, so they must be backfilled from EDF headers or
+reprocessed before event-level false-alarm rates are computed. The last
+complete window end is only a lower bound because a trailing partial window
+may exist. Do **not** use that lower bound as the false-alarm-rate denominator.
 
 ## Matching and aggregation
 
