@@ -8,18 +8,30 @@ from __future__ import annotations
 import numpy as np
 
 
-def channel_sufficient_statistics(windows: np.ndarray) -> dict[str, object]:
-    """Return population count, mean and M2 per channel for one recording."""
-    values = np.asarray(windows, dtype=np.float64)
+def channel_sufficient_statistics(
+    windows: np.ndarray, chunk_size: int = 256
+) -> dict[str, object]:
+    """Return population count, mean and M2 per channel using bounded memory."""
+    values = np.asarray(windows)
     if values.ndim != 3 or any(size == 0 for size in values.shape):
         raise ValueError("windows must have non-empty (windows, channels, samples) shape")
-    if not np.isfinite(values).all():
-        raise ValueError("windows contain non-finite values")
-    flattened = values.transpose(1, 0, 2).reshape(values.shape[1], -1)
-    mean = np.mean(flattened, axis=1)
-    centered = flattened - mean[:, None]
-    m2 = np.sum(centered * centered, axis=1)
-    return {"count": int(flattened.shape[1]), "mean": mean, "m2": m2}
+    if not isinstance(chunk_size, (int, np.integer)) or isinstance(chunk_size, bool) or chunk_size <= 0:
+        raise ValueError("chunk_size must be a positive integer")
+    state = None
+    for start in range(0, len(values), int(chunk_size)):
+        chunk = np.asarray(values[start:start + int(chunk_size)], dtype=np.float64)
+        if not np.isfinite(chunk).all():
+            raise ValueError("windows contain non-finite values")
+        flattened = chunk.transpose(1, 0, 2).reshape(chunk.shape[1], -1)
+        mean = np.mean(flattened, axis=1)
+        centered = flattened - mean[:, None]
+        batch = {
+            "count": int(flattened.shape[1]),
+            "mean": mean,
+            "m2": np.sum(centered * centered, axis=1),
+        }
+        state = batch if state is None else merge_channel_statistics(state, batch)
+    return state
 
 
 def merge_channel_statistics(
