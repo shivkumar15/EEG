@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +23,6 @@ from config import PREFERRED_CHANNELS
 from data_management.cohort import filter_primary_cohort
 from data_management.dataset_split import build_lopo_folds
 from data_management.patient_mapping import load_recording_manifest
-from evaluation.oof_scaler_cache import patient_grouped_channel_scale
 from feature_selection.robust_feature_extraction import ROBUST_FEATURE_NAMES
 from scripts.run_inner_patient_oof import (
     aggregate_patient_statistics,
