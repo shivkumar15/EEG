@@ -54,12 +54,10 @@ def _quantiles(values: np.ndarray) -> dict:
             "median": float(median), "q75": float(q75), "iqr": float(q75-q25)}
 
 
-def _collect(X, y, records, patient, feature_index, label):
+def _collect(X, y, patient_records, feature_index, label):
     chunks = []
     recording_count = 0
-    for rec in records:
-        if rec["patient_id"] != patient:
-            continue
+    for rec in patient_records:
         start, end = int(rec["start"]), int(rec["end"])
         labels = y[start:end]
         mask = labels == label
@@ -119,7 +117,6 @@ def run(audit: Path, output: Path = DEFAULT_OUTPUT):
 
     work_root = OOF_ROOT / "feature_work"
     work_root.mkdir(parents=True, exist_ok=True)
-    output.mkdir(parents=True, exist_ok=False)
     rows = []
     fold_summaries = []
 
@@ -138,6 +135,8 @@ def run(audit: Path, output: Path = DEFAULT_OUTPUT):
             if any(r["patient_id"] == "patient_01" for r in offsets):
                 raise RuntimeError("patient_01 appeared in fold feature offsets")
 
+            patient_offsets = {patient: [r for r in offsets if r["patient_id"] == patient]
+                               for patient in patients}
             fold_rows = []
             for channel_index, channel in enumerate(PREFERRED_CHANNELS):
                 for feature_offset, feature_name in enumerate(ROBUST_FEATURE_NAMES):
@@ -146,7 +145,7 @@ def run(audit: Path, output: Path = DEFAULT_OUTPUT):
                         patient_stats = {}
                         for patient in patients:
                             values, rec_count = _collect(
-                                X, y, offsets, patient, feature_index, label
+                                X, y, patient_offsets[patient], feature_index, label
                             )
                             patient_stats[patient] = (
                                 _quantiles(values) if values.size else None, rec_count
@@ -195,6 +194,7 @@ def run(audit: Path, output: Path = DEFAULT_OUTPUT):
             del X, y
             _remove_work_files(folder)
 
+    output.mkdir(parents=True, exist_ok=False)
     csv_path = output / "fold_aware_patient_feature_distributions.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
