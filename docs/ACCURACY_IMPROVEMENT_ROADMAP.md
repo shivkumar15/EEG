@@ -77,7 +77,7 @@ Tasks:
 1. **Implemented on the active branch (local tests pending):** `evaluation/event_metrics.py` converts binary window predictions into merged alarm intervals, matches alarms to seizure annotations, calculates event sensitivity/detection delay, and computes false alarms/hour using non-seizure exposure.
 2. **Implemented:** deterministic tests cover alarm merging, short-gap policy, detected/missed events, false alarms, boundary-only contact, multiple events, manifest interval parsing and pooled aggregation.
 3. **Implemented:** newly processed NPZ and metadata artifacts persist exact EDF recording duration. Existing processed NPZ files predate this field and must be backfilled from EDF headers or reprocessed before event false-alarm rates are calculated.
-4. **Implemented on branch; local tests pending:** `scripts/backfill_recording_durations.py` performs restartable EDF-header-only duration backfill, updates aligned metadata CSVs and a central JSON manifest, and preserves existing NPZ bytes. Synthetic tests cover idempotent resume, dry-run, missing EDF handling and NPZ preservation.
+4. **Implemented and locally verified:** `scripts/backfill_recording_durations.py` performs restartable EDF-header-only duration backfill, updates aligned metadata CSVs and a central JSON manifest, and preserves existing NPZ bytes. Synthetic tests cover idempotent resume, dry-run, missing EDF handling and NPZ preservation. Focused tests 4/4 and full suite 151 passed, 4 subtests passed, 4 skipped.
 5. Next: integrate per-recording event evaluation into the first-fold runner without tuning on outer-test labels.
 5. Keep window metrics and event metrics in separate result fields.
 
@@ -171,9 +171,10 @@ The pilot is an engineering/runtime check, not a performance claim. Every long j
 | 1 | Stop or leave paused the unverified robust-feature run; do not start it again yet | Required before further experiments |
 | 2 | Install pytest and run focused feature tests | **Complete (5 Nov 2026):** focused robust-feature tests 6/6 passed in 1.20 s; full repository suite 136 passed, 4 subtests passed, 4 skipped, 0 failures/errors in 3.95 s |
 | 3 | Implement event-level metrics, alarm post-processing, synthetic tests and exact-duration persistence | **Complete:** focused 12/12 and full suite 147 passed; 4 subtests passed, 4 skipped |
-| 4 | Implement restartable exact-duration backfill | Code + synthetic tests committed; local verification pending |
-| 5 | Integrate event metrics into the first-fold runner | Next; no model training |
-| 6 | Inspect/optimize scaler and feature-cache runtime using a timed pilot | Pending; no full-cohort run |
+| 4 | Implement restartable exact-duration backfill | **Complete:** 4/4 focused tests; full suite 151 passed |
+| 5 | Dry-run duration backfill on the real 683-recording cohort | Next; inspect failures before writing |
+| 6 | Integrate event metrics into the first-fold runner | After duration coverage is verified |
+| 7 | Inspect/optimize scaler and feature-cache runtime using a timed pilot | Pending; no full-cohort run |
 | 6 | Finalize the threshold/refit protocol comparison | Controlled pilot only |
 | 7 | Run first-fold engineering pilot and inspect per-event errors | After gates 2–6 |
 | 8 | Build and run restartable 23-fold classical evaluation | After pilot approval |
