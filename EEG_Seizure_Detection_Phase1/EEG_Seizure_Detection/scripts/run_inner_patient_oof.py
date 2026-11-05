@@ -19,18 +19,19 @@ if str(ROOT) not in sys.path:
 from config import PROCESSED_DIR, PREFERRED_CHANNELS, RANDOM_STATE
 from data_management.cohort import filter_primary_cohort
 from data_management.dataset_split import build_lopo_folds
-from data_management.fold_data import processed_path_for_recording
+from data_management.fold_data import load_recording_windows, processed_path_for_recording
 from data_management.patient_mapping import load_recording_manifest
 from data_management.validation_split import build_patient_validation_split
 from evaluation.oof_scaler_cache import (
-    finalize_channel_statistics, log_std_from_raw_standard_deviations,
-    merge_channel_statistics, patient_grouped_channel_scale,
+    exact_log_std_fallback_mask, finalize_channel_statistics,
+    log_std_from_raw_standard_deviations, merge_channel_statistics,
+    patient_grouped_channel_scale, recompute_log_std_features,
 )
 from modeling.baseline import calculate_metrics
 
 FEATURES_PER_CHANNEL = 10
 FEATURE_COUNT = len(PREFERRED_CHANNELS) * FEATURES_PER_CHANNEL
-VERSION = "patient_grouped_oof_robust_v2"
+VERSION = "patient_grouped_oof_robust_v3"
 
 
 def atomic_json(path, value):
@@ -118,7 +119,8 @@ def audit_raw_std_approximation(robust_root, std_root, std_manifest, row_lookup,
         raise RuntimeError("Invalid original scaler checkpoint state filename")
     with np.load(checkpoint / state_name, allow_pickle=False) as saved:
         state = {"count": int(saved["count"]), "mean": saved["mean"], "m2": saved["m2"]}
-    _, original_scale = finalize_channel_statistics(state)
+    original_mean, original_scale = finalize_channel_statistics(state)
+    fallback_window_count = 0
     entries = {e["relative_path"]: e for e in std_manifest["entries"]}
     columns = np.arange(len(PREFERRED_CHANNELS)) * FEATURES_PER_CHANNEL
     max_error, mismatch_count, floor_mismatches, checked = 0.0, 0, 0, 0
@@ -131,6 +133,17 @@ def audit_raw_std_approximation(robust_root, std_root, std_manifest, row_lookup,
             if str(saved["signature"].item()) != entry["signature"]:
                 raise RuntimeError(f"Raw-std signature mismatch during numerical audit: {rec.relative_path}")
             reconstructed = log_std_from_raw_standard_deviations(raw_std, original_scale)
+            fallback_mask = exact_log_std_fallback_mask(raw_std, original_scale)
+            if np.any(fallback_mask):
+                original_windows = load_recording_windows(PROCESSED_DIR, rec)
+                if len(original_windows.X) != len(raw_std):
+                    raise RuntimeError(f"Fallback window alignment mismatch: {rec.relative_path}")
+                exact_values = recompute_log_std_features(
+                    original_windows.X[fallback_mask], original_mean, original_scale
+                )
+                reconstructed[fallback_mask] = exact_values
+                fallback_window_count += int(np.count_nonzero(fallback_mask))
+                del original_windows, exact_values
         actual = np.asarray(source_x[start:end, :][:, columns], dtype=np.float32)
         if reconstructed.shape != actual.shape:
             raise RuntimeError(f"Raw-std numerical audit shape mismatch: {rec.relative_path}")
@@ -146,7 +159,9 @@ def audit_raw_std_approximation(robust_root, std_root, std_manifest, row_lookup,
     if mismatch_count or floor_mismatches:
         raise RuntimeError("Raw-std approximation failed real validation-cache audit; refusing OOF training")
     return {"checked_values": checked, "max_absolute_error": max_error,
-            "values_over_tolerance": mismatch_count, "floor_mismatches": floor_mismatches}
+            "values_over_tolerance": mismatch_count, "floor_mismatches": floor_mismatches,
+            "exact_fallback_windows": fallback_window_count,
+            "fallback_rule_normalized_std_at_most": 1e-4}
 
 
 def aggregate_patient_statistics(stats_root, manifest, outer_train):
@@ -182,13 +197,13 @@ def fold_channel_scale(heldout_patient, patient_states):
     # This fold's held-out patient's entire recordings are excluded from scaler fit.
     if len(patient_states) != 22:
         raise RuntimeError("OOF channel scaler requires exactly 22 patients")
-    _, scale = patient_grouped_channel_scale(patient_states, heldout_patient)
-    return scale
+    mean, scale = patient_grouped_channel_scale(patient_states, heldout_patient)
+    return mean, scale
 
 
 def build_fold_matrix(
     heldout, outer_train, row_lookup, base_signature, stats_entries,
-    std_root, std_manifest, fold_scale, work_root,
+    std_root, std_manifest, fold_mean, fold_scale, work_root,
 ):
     """Create/resume one fold's features, all using the SAME 21-patient scaler."""
     std_entries = {e["relative_path"]: e for e in std_manifest["entries"]}
@@ -196,6 +211,7 @@ def build_fold_matrix(
     signature = digest({
         "version": VERSION, "base_signature": base_signature,
         "std_manifest": digest(std_manifest), "heldout_patient": heldout,
+        "fold_mean": np.asarray(fold_mean, dtype=np.float64).tolist(),
         "fold_scale": np.asarray(fold_scale, dtype=np.float64).tolist(),
     })
     folder = work_root / heldout
@@ -259,15 +275,31 @@ def build_fold_matrix(
         except (OSError, EOFError, ValueError, KeyError, zipfile.BadZipFile) as exc:
             raise RuntimeError(f"Could not load raw std for {rec.relative_path}") from exc
 
+        fallback_mask = exact_log_std_fallback_mask(raw_std, fold_scale)
+        original_windows = None
+        if np.any(fallback_mask):
+            original_windows = load_recording_windows(PROCESSED_DIR, rec)
+            if len(original_windows.X) != count:
+                raise RuntimeError(f"Fallback window alignment mismatch: {rec.relative_path}")
+
         for chunk_start in range(0, count, 4096):
             chunk_end = min(chunk_start + 4096, count)
             block = np.asarray(source_x[source_start + chunk_start:source_start + chunk_end],
                                dtype=np.float32).copy()
-            block[:, np.arange(len(PREFERRED_CHANNELS)) * FEATURES_PER_CHANNEL] = (
-                log_std_from_raw_standard_deviations(raw_std[chunk_start:chunk_end], fold_scale)
-            )
+            chunk_raw_std = raw_std[chunk_start:chunk_end]
+            chunk_log_std = log_std_from_raw_standard_deviations(chunk_raw_std, fold_scale)
+            local_fallback = fallback_mask[chunk_start:chunk_end]
+            if np.any(local_fallback):
+                exact_values = recompute_log_std_features(
+                    original_windows.X[chunk_start:chunk_end][local_fallback],
+                    fold_mean, fold_scale,
+                )
+                chunk_log_std[local_fallback] = exact_values
+            block[:, np.arange(len(PREFERRED_CHANNELS)) * FEATURES_PER_CHANNEL] = chunk_log_std
             dest = cursor + chunk_start
             X[dest:dest + len(block)] = block
+        if original_windows is not None:
+            del original_windows
         y[cursor:cursor + count] = source_y[source_start:source_end]
         cursor += count
         X.flush()
@@ -376,11 +408,12 @@ def run(audit, seed=RANDOM_STATE):
     results, all_y, all_scores = [], [], []
 
     for fold_index, heldout in enumerate(patient_ids, 1):
-        fold_scale = fold_channel_scale(heldout, patient_states)
+        fold_mean, fold_scale = fold_channel_scale(heldout, patient_states)
         signature = digest({"version": VERSION, "base_signature": base_signature,
                             "stats_manifest": digest(stats_manifest), "std_manifest": digest(std_manifest),
                             "heldout_patient": heldout, "seed": seed,
                             "model": "LogisticRegression(liblinear,balanced,max_iter=1000)",
+                            "fold_mean": fold_mean.tolist(),
                             "fold_scale": fold_scale.tolist()})
         artifact = fold_dir / f"{heldout}.npz"
         cached = False
@@ -402,7 +435,7 @@ def run(audit, seed=RANDOM_STATE):
         else:
             X, y, offsets, work_folder = build_fold_matrix(
                 heldout, outer.train_recordings, row_lookup, base_signature,
-                stats_entries, std_root, std_manifest, fold_scale, work_root,
+                stats_entries, std_root, std_manifest, fold_mean, fold_scale, work_root,
             )
             fold_y, scores, recording_offsets = train_score_fold(
                 heldout, fold_index, X, y, offsets, output, seed
