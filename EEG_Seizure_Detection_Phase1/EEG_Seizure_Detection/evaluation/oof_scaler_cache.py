@@ -164,6 +164,32 @@ def log_std_from_raw_standard_deviations(
     return result
 
 
+def exact_log_std_fallback_mask(
+    raw_std: np.ndarray,
+    scale: np.ndarray,
+    normalized_std_threshold: float = 1e-4,
+) -> np.ndarray:
+    """Flag windows whose tiny normalized variation may be altered by float32 rounding.
+
+    This is a conservative routing rule, not a change to the feature definition.
+    Flagged windows must be recomputed from the original EEG samples using the
+    exact FoldChannelStandardizer float32 transform and extractor calculation.
+    """
+    values = np.asarray(raw_std, dtype=np.float64)
+    channel_scale = np.asarray(scale, dtype=np.float64)
+    if values.ndim != 2 or values.shape[1] != len(channel_scale):
+        raise ValueError("raw_std must be (windows, channels) and match scale")
+    if not np.isfinite(values).all() or np.any(values < 0):
+        raise ValueError("raw_std must be finite and non-negative")
+    if not np.isfinite(channel_scale).all() or np.any(channel_scale <= 0):
+        raise ValueError("scale must be finite and positive")
+    if (not np.isfinite(normalized_std_threshold)
+            or normalized_std_threshold <= 0):
+        raise ValueError("normalized_std_threshold must be finite and positive")
+    normalized_std = values / channel_scale[None, :]
+    return np.any(normalized_std <= normalized_std_threshold, axis=1)
+
+
 def patient_grouped_channel_scale(
     patient_statistics: dict[str, dict[str, object]],
     heldout_patient: str,
