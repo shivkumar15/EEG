@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+from math import isfinite
 from pathlib import Path
 import re
 from typing import Sequence
@@ -36,8 +37,8 @@ def load_recording_durations(
     if not path.is_file():
         raise FileNotFoundError(f"Recording inventory not found: {path}")
     tolerance = float(duration_tolerance_seconds)
-    if tolerance < 0:
-        raise ValueError("Duration tolerance must be non-negative")
+    if not isfinite(tolerance) or tolerance < 0:
+        raise ValueError("Duration tolerance must be finite and non-negative")
 
     rows: dict[str, dict] = {}
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -62,8 +63,12 @@ def load_recording_durations(
                 duration = float(row["duration_seconds"])
             except (TypeError, ValueError, KeyError) as exc:
                 raise ValueError(f"Invalid duration fields on inventory row {line_number}") from exc
-            if samples <= 0 or sampling_frequency <= 0 or duration <= 0:
-                raise ValueError(f"Non-positive duration fields on inventory row {line_number}: {key}")
+            if (
+                samples <= 0
+                or not isfinite(sampling_frequency) or sampling_frequency <= 0
+                or not isfinite(duration) or duration <= 0
+            ):
+                raise ValueError(f"Invalid duration fields on inventory row {line_number}: {key}")
             calculated = samples / sampling_frequency
             if abs(duration - calculated) > tolerance:
                 raise ValueError(
