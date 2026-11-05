@@ -171,7 +171,7 @@ def main() -> None:
     result = compare_results(args.legacy, args.robust)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_suffix(args.output.suffix + ".tmp")
-    temporary.write_text(json.dumps(result, indent=2, allow_nan=False) + "\\n",
+    temporary.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n",
                          encoding="utf-8")
     temporary.replace(args.output)
     print(json.dumps({
