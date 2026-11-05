@@ -169,14 +169,15 @@ The pilot is an engineering/runtime check, not a performance claim. Every long j
 | 0 | Freeze this roadmap and reconcile phase numbering/branch status in project docs | This document establishes the proposed roadmap |
 | 1 | Stop or leave paused the unverified robust-feature run; do not start it again yet | Required before further experiments |
 | 2 | Install pytest and run focused feature tests | **Complete (5 Nov 2026):** focused robust-feature tests 6/6 passed in 1.20 s; full repository suite 136 passed, 4 subtests passed, 4 skipped, 0 failures/errors in 3.95 s |
-| 3 | Inspect/optimize scaler and feature-cache runtime using a timed pilot | Next engineering task; no full-cohort run |
-| 4 | Implement and test event-level metrics and alarm rules | Required before accuracy claims |
-| 5 | Finalize the threshold/refit protocol comparison | Controlled pilot only |
-| 6 | Run first-fold engineering pilot and inspect per-event errors | After gates 2–5 |
-| 7 | Build and run restartable 23-fold classical evaluation | After pilot approval |
-| 8 | Run targeted feature/imbalance/model comparisons | After full baseline |
-| 9 | Run deep-learning models and ablations | After classical baseline |
-| 10 | Freeze model, API, React integration and final report | Final stage |
+| 3 | Implement event-level metrics, alarm post-processing, synthetic tests and exact-duration persistence | Code committed; local test run pending |
+| 4 | Backfill exact duration for existing processed recordings and integrate event metrics into runner | Next; no model training |
+| 5 | Inspect/optimize scaler and feature-cache runtime using a timed pilot | Pending; no full-cohort run |
+| 6 | Finalize the threshold/refit protocol comparison | Controlled pilot only |
+| 7 | Run first-fold engineering pilot and inspect per-event errors | After gates 2–6 |
+| 8 | Build and run restartable 23-fold classical evaluation | After pilot approval |
+| 9 | Run targeted feature/imbalance/model comparisons | After full baseline |
+| 10 | Run deep-learning models and ablations | After classical baseline |
+| 11 | Freeze model, API, React integration and final report | Final stage |
 
 ## 7. Documentation and phase-number reconciliation
 
