@@ -321,3 +321,25 @@ Next:
    cache/checkpoints intact).
 3. Design the reusable scale-free feature cache only after those two review
    gates are closed.
+
+
+---
+
+## CTO research target — event sensitivity and false-alarm operating point
+
+For this academic research project, use **at least 90% event sensitivity**
+as an aspirational development target, with **no more than 1.0 false alarm
+per non-seizure hour** as the primary research operating point. Additionally
+report sensitivity at 0.1 and 0.5 false alarms/hour, detection delay, and
+patient-level distributions. These are research engineering objectives, not
+clinical safety or medical-device acceptance criteria.
+
+Success must be assessed across all 23 outer patient-level folds using both
+pooled event counts and patient-macro summaries. A pooled 90% score alone is
+insufficient if performance is poor for individual patients. The first-fold
+robust result (4/11 events, 36.36%, at 2.281 false alarms/hour) is currently
+well below this target and cannot establish generalization.
+
+Next: compare legacy and robust per-event outcomes descriptively, then design
+alarm-policy experiments using patient-grouped inner OOF predictions only.
+Never tune from the already observed patient_01 outer-test results.
