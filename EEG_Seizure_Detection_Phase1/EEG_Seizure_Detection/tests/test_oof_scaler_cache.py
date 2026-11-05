@@ -116,3 +116,55 @@ def test_patient_grouped_scaler_omits_validation_patient():
     mean, scale = patient_grouped_channel_scale({"a": a, "b": b, "c": c}, "c")
     assert mean[0] == pytest.approx(6.0)
     assert scale[0] == pytest.approx(np.sqrt(24.0))
+
+
+
+def test_exact_fallback_mask_flags_only_low_normalized_variation_windows():
+    from evaluation.oof_scaler_cache import exact_log_std_fallback_mask
+
+    raw_std = np.array([[1e-15, 2e-15], [1e-3, 2e-3], [1e-8, 2e-3]])
+    scale = np.array([1e-4, 1e-4])
+    np.testing.assert_array_equal(
+        exact_log_std_fallback_mask(raw_std, scale),
+        np.array([True, False, True]),
+    )
+
+
+def test_exact_fallback_reproduces_original_float32_extractor_for_near_constant_windows():
+    from evaluation.oof_scaler_cache import (
+        exact_log_std_fallback_mask,
+        recompute_log_std_features,
+        window_channel_standard_deviations,
+    )
+    from feature_selection.robust_feature_extraction import extract_robust_features
+
+    # Tiny raw variation around zero becomes a small nonzero normalized level
+    # after applying a fold mean. Float32 rounding changes the resulting std.
+    ramp = np.linspace(-2e-15, 2e-15, 128, dtype=np.float64)
+    windows = np.stack([ramp, ramp * 0.75])[None, :, :]
+    mean = np.array([-5.109097766828098e-10, -2.9123343466072157e-10])
+    scale = np.array([5.8258332560013724e-5, 5.46497477406169e-5])
+
+    raw_std = window_channel_standard_deviations(windows)
+    mask = exact_log_std_fallback_mask(raw_std, scale)
+    assert mask.tolist() == [True]
+
+    exact = recompute_log_std_features(windows[mask], mean, scale)
+    standardized = ((windows[mask] - mean[None, :, None])
+                    / scale[None, :, None]).astype(np.float32)
+    expected = extract_robust_features(standardized, 128)[:, 0::10]
+    np.testing.assert_array_equal(exact, expected)
+
+
+@pytest.mark.parametrize(
+    "raw_std,scale",
+    [
+        (np.array([[np.nan]]), np.array([1.0])),
+        (np.array([[-1.0]]), np.array([1.0])),
+        (np.array([[1.0]]), np.array([0.0])),
+    ],
+)
+def test_exact_fallback_mask_rejects_invalid_inputs(raw_std, scale):
+    from evaluation.oof_scaler_cache import exact_log_std_fallback_mask
+    with pytest.raises(ValueError):
+        exact_log_std_fallback_mask(raw_std, scale)
