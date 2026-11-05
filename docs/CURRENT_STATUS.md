@@ -1,8 +1,8 @@
 # Current Project Status — 4 November 2026
 
 **Active repository:** https://github.com/shivkumar15/EEG  
-**Active branch:** `feature/model-stage-checkpoints`  
-**Current milestone:** Phase 4.5.2 — model-stage checkpoint verification.
+**Active branch:** `feature/threshold-strategy-score-artifacts`  
+**Current milestone:** Phase 4 baseline engineering — accuracy roadmap Gate 0 regression checks passed; event-level evaluation is the next implementation milestone.
 
 ## Project objective
 
@@ -60,7 +60,7 @@ Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached
 
 **Known limitation:** an interrupted `LogisticRegression(solver="liblinear")` fit must restart from the beginning; the solver does not provide a supported mid-fit continuation mechanism. Checkpoints preserve completed stages, not an in-progress solver state.
 
-**Verification state:** implementation is present on `feature/model-stage-checkpoints`. User is correcting local environment/path setup. Current compile, focused checkpoint tests, full regression suite and controlled runner interruption/restart have not yet been confirmed in this status record. Do not assume a test count or start an expensive full-data experiment until outputs are reviewed.
+**Verification state (5 November 2026):** the active branch `feature/threshold-strategy-score-artifacts` is 19 commits ahead of `feature/model-stage-checkpoints` and includes the model-stage checkpoint implementation. The user reports the complete repository test suite passing: 136 passed, 4 subtests passed, 4 skipped, in 3.95 seconds. The robust feature extraction tests also pass: 6/6 in 1.20 seconds. These are local software-test results; they do not validate model accuracy or prove an actual long-running process can resume from a real interruption. A controlled runner interruption/restart test remains pending. Do not start an expensive full-data experiment until runtime and recovery gates are reviewed.
 
 ## Immediate next actions
 
