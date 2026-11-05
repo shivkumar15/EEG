@@ -74,10 +74,10 @@ These settings may be selected on inner validation only. They must be frozen bef
 **Goal:** Ensure that the project optimizes the right outcome and can explain every miss/false alarm.
 
 Tasks:
-1. Implement a tested window-score-to-alarm post-processing module.
-2. Implement event matching and false-alarms/hour calculations using seizure annotations, recording start times, window starts and durations.
-3. Add synthetic unit tests for: one detected event, missed event, duplicate alarms, alarms merged across a short gap, false alarm in seizure-free time, and recording-boundary handling.
-4. Produce per-patient/per-event error tables: event duration, event count, detected/missed status, alarm timing, and score summary.
+1. **Implemented on the active branch (local tests pending):** `evaluation/event_metrics.py` converts binary window predictions into merged alarm intervals, matches alarms to seizure annotations, calculates event sensitivity/detection delay, and computes false alarms/hour using non-seizure exposure.
+2. **Implemented:** deterministic tests cover alarm merging, short-gap policy, detected/missed events, false alarms, boundary-only contact, multiple events, manifest interval parsing and pooled aggregation.
+3. **Implemented:** newly processed NPZ and metadata artifacts persist exact EDF recording duration. Existing processed NPZ files predate this field and must be backfilled from EDF headers or reprocessed before event false-alarm rates are calculated.
+4. Next: add a safe duration backfill utility for existing artifacts, then integrate per-recording event evaluation into the first-fold runner without tuning on outer-test labels.
 5. Keep window metrics and event metrics in separate result fields.
 
 **Exit gate:** event metrics pass deterministic synthetic tests; alarm rules are documented and frozen before any model comparison.
@@ -179,11 +179,9 @@ The pilot is an engineering/runtime check, not a performance claim. Every long j
 | 10 | Run deep-learning models and ablations | After classical baseline |
 | 11 | Freeze model, API, React integration and final report | Final stage |
 
-## 7. Documentation and phase-number reconciliation
+## 7. Execution focus
 
-The project has used more than one phase label in conversation. The current status/master-plan documents on the reviewed branch describe Phase 4.5.2 checkpoint verification, while the user refers to Phase 4.2.2. Do not silently renumber or claim a milestone complete. Reconcile the phase labels against the actual commit history and local test evidence in `CURRENT_STATUS.md` before the next execution milestone.
-
-The reviewed branch documentation also names `feature/model-stage-checkpoints` as active, while the recent local workflow used `feature/threshold-strategy-score-artifacts`. Confirm the intended working branch and synchronize the status docs before a broad implementation or experiment.
+Phase labels are not a blocker for this work. Continue the accuracy-improvement pipeline in the execution order above; do not spend further time reconciling conversational phase numbers.
 
 ## 8. Decision rule
 
