@@ -470,3 +470,43 @@ The OOF run is a substantial 22-model workload. Preserve all caches and score ar
 
 
 **Additional numerical safety gate:** before OOF fitting, the runner compares raw-std-reconstructed `log_std` values against every existing inner-validation feature row under the original scaler. It refuses to train if any value differs by more than `5e-4` or if any `log(1e-12)` floor classification differs. This check is pending local execution.
+
+
+
+### OOF raw-std numerical precision correction — committed, local verification pending (5 November 2026)
+
+The first real-data numerical audit correctly stopped before OOF model fitting:
+3,672,085 validation log-std values were checked; two values in
+`chb17/chb17b_69.edf`, window 296 (channels P3-O1 and P4-O2), exceeded the
+`5e-4` tolerance. Both windows had extremely small raw standard deviation.
+The cause was a numerical difference between calculating standard deviation
+after the original float32 fold-normalization transform and reconstructing it
+from raw standard deviation before that float32 rounding.
+
+Correction committed:
+- Add a conservative low-normalized-variation detector for precision-sensitive
+  windows.
+- Recompute flagged windows from their original processed EEG samples using
+  the exact float32 normalization and original log-std calculation.
+- Keep the original audit tolerance (`5e-4)); do not weaken it.
+- Bump the OOF runner implementation version to
+  `patient_grouped_oof_robust_v3`, so old intermediate feature work cannot be
+  mistaken for the corrected implementation.
+- Add regression tests for near-constant signals and invalid fallback inputs.
+- Add `--audit-only` mode so the complete real-data numerical audit can be run
+  without beginning the expensive 22-fold training.
+
+Relevant commits:
+- `272b5b5` precision-sensitive fallback detector.
+- `dee958c` exact fallback in OOF audit and fold feature construction.
+- `638825e` regression tests.
+- `da0a12d` near-constant test window-length correction.
+- `17ef3ed` audit-only CLI mode.
+
+**Verification pending:** user must pull the latest branch and run the focused
+tests. Then run the runner with `--audit-only`. Proceed to full OOF training
+only if the audit reports `over_tolerance=0` and `floor_mismatches=0`.
+The audit-only mode must report that no OOF models were trained. Do not change
+the tolerance or bypass this gate. Existing 608-recording raw-std cache and
+recording-statistics cache are retained; no cache rebuild is currently
+required. The outer-test patient `patient_01` remains excluded.
