@@ -47,6 +47,7 @@ def build(audit, cache):
                 with np.load(artifact, allow_pickle=False) as z:
                     a = z["std"]
                     valid = (str(z["signature"].item()) == signature and a.ndim == 2
+                             and int(z["window_count"]) == a.shape[0]
                              and a.shape[1] == len(PREFERRED_CHANNELS) and a.shape[0] > 0
                              and a.dtype == np.float32 and np.isfinite(a).all() and np.all(a >= 0))
             except (OSError, EOFError, ValueError, KeyError, zipfile.BadZipFile):
