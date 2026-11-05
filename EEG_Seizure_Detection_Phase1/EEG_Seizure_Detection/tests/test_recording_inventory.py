@@ -57,6 +57,15 @@ class RecordingInventoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "arithmetic mismatch"):
                 load_recording_durations(path, [self.recording])
 
+    def test_non_finite_duration_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = self.write_inventory(
+                Path(temp),
+                "chb01,chb01_03.edf,chb01/chb01_03.edf,256,25600,nan,23,x,SUCCESS,\n",
+            )
+            with self.assertRaisesRegex(ValueError, "Invalid duration fields"):
+                load_recording_durations(path, [self.recording])
+
     def test_subject_or_filename_mismatch_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             path = self.write_inventory(
