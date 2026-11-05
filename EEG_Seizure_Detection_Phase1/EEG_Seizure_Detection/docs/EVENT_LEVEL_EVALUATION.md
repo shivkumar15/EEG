@@ -206,3 +206,47 @@ python -m scripts.evaluate_first_fold_events --audit ..\\..\\docs\\full_annotati
 Override the inventory path with `--inventory PATH` if needed. New tests cover
 normalized identity joins, duplicate and missing rows, inconsistent duration
 arithmetic, and identity mismatches.
+
+
+---
+
+## Full 22-patient inner OOF event evaluation — implementation
+
+`scripts/evaluate_inner_oof_events.py` evaluates the saved patient-held-out
+OOF score artifacts without retraining or re-extracting features.
+
+The evaluator:
+- Reconstructs the canonical 22-patient inner OOF cohort from the annotation
+  audit and explicitly excludes outer-test `patient_01`.
+- Validates every fold artifact, patient identity, ordered recording offsets,
+  contiguous score slices, score/label dimensions, report counts, and exact
+  processed-recording identity.
+- Aligns each recording's saved OOF scores with its processed labels and
+  timestamps; any identity, ordering, or label mismatch stops evaluation.
+- Joins the exact duration inventory by normalized recording identity, with
+  subject and EDF filename cross-checks.
+- Reports event sensitivity, missed events, detection delay, false-alarm
+  episodes, non-seizure exposure and false alarms/hour at each requested
+  threshold, with recording-, patient- and cohort-level summaries.
+- Does not fit a model, extract features, select thresholds, or load
+  `patient_01`.
+
+By default it reports both the fixed 0.5 reference threshold and the
+provisional pooled OOF window-F2 threshold stored in `report.json`. The
+pooled threshold was selected using these same OOF labels; its event metrics
+are descriptive and must not be presented as an unbiased estimate. Scores
+from the 22 distinct fold models may also differ in calibration. Threshold
+selection and cross-fold calibration review remain separate follow-up work.
+
+Run from the `EEG_Seizure_Detection` directory:
+
+```powershell
+python -m pytest tests/test_inner_oof_event_evaluation.py -q
+python -m scripts.evaluate_inner_oof_events --audit ..\\..\\docs\\full_annotation_audit.csv
+```
+
+Default output:
+`results/baselines/inner_oof_event_metrics_v1.json`.
+
+The user should run the focused tests and inspect the complete evaluator
+output before any threshold or alarm-policy decision is made.
