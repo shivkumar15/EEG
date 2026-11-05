@@ -67,14 +67,16 @@ Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached
 - Added `evaluation/event_metrics.py` for positive-window alarm merging, annotation overlap matching, event sensitivity, detection delay, false-alarm count and false alarms per non-seizure hour.
 - Added deterministic synthetic tests in `tests/test_event_metrics.py`.
 - Added `docs/EVENT_LEVEL_EVALUATION.md` to freeze version-1 semantics.
-- Newly processed NPZ and metadata files now store exact EDF recording duration. Added `scripts/backfill_recording_durations.py` to read existing EDF headers without preloading signals and write duration into aligned metadata CSVs plus `processed/recording_durations.json`; existing NPZ archives are preserved byte-for-byte. Local verification of this utility is pending.
+- Newly processed NPZ and metadata files store exact EDF recording duration. The existing 683-recording processed cohort predates that change. The user confirmed the extracted original EDF dataset was deleted after earlier guidance that it was no longer required. The attempted backfill dry-run consequently found all 683 EDF paths missing; it made no changes. Do not ask the user to download/reprocess the dataset again at this stage.
+- Added a read-only `scripts/audit_recording_durations.py` to inspect existing NPZ duration fields, aligned metadata CSVs and any central duration manifest. It does not read EDFs or modify data. Run this first to establish whether exact durations survived in any retained artifact.
+- If exact durations are absent, event sensitivity, missed/detected event counts and detection delay can still be evaluated from annotations and window timestamps. False alarms/hour must remain unavailable until exact recording exposure can be sourced; do not substitute the last complete window end as recording duration.
 - **Local verification complete (5 November 2026):** focused event + saved-window tests 12/12 passed in 2.14 seconds; full suite 147 passed, 4 subtests passed, 4 skipped, 0 failures, in 3.43 seconds.
 
 ## Immediate next actions
 
-1. Run the backfill utility in `--dry-run` mode against the real 683-recording cohort; inspect updated/skipped/failed counts and error file if any.
-2. If dry-run is clean, run the actual backfill and verify 683/683 duration entries plus metadata alignment.
-3. Integrate event evaluation into the first-fold runner, retaining recording identity, timestamps and exact duration in each score artifact.
+1. Pull the latest branch and run `python -m pytest tests/test_duration_audit.py -q`.
+2. Run the read-only duration audit against the retained 683-recording cohort; inspect available, missing and conflicting duration counts.
+3. Adapt the first-fold event evaluator to use only verified retained metadata. If duration is unavailable, report event sensitivity/delay and false-alarm counts, while leaving false alarms/hour null.
 4. Add patient-level event summaries and per-event error tables.
 5. Profile representative feature/scaler stages and validate recovery before authorizing any model training.
 
