@@ -38,5 +38,11 @@ def test_rejects_invalid_sampling_rate():
 
 
 def test_rejects_too_short_window_for_spectral_features():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="at least 2 seconds"):
         extract_robust_features(np.ones((1, 1, 128)), 256)
+
+
+def test_accepts_exactly_two_seconds_for_spectral_features():
+    result = extract_robust_features(np.ones((1, 1, 512)), 256)
+    assert result.shape == (1, len(ROBUST_FEATURE_NAMES))
+    assert np.isfinite(result).all()
