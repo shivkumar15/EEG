@@ -1,117 +1,86 @@
 # AI / Teammate Handoff
 
-**Read this file together with `docs/CURRENT_STATUS.md` and `docs/PROJECT_MASTER_PLAN.md` before changing code.**
+**Read first:** [Complete Project Handoff](PROJECT_HANDOFF.md).  
+Then read [Current Project Status](CURRENT_STATUS.md), [Experiment History and Results](EXPERIMENT_HISTORY_AND_RESULTS.md), and [Project Master Plan](PROJECT_MASTER_PLAN.md).
 
-## 1. Repository roles
+## Repository and environment
 
 - Active working repository: https://github.com/shivkumar15/EEG
-- Current branch for model-stage recovery: `feature/model-stage-checkpoints`
-- Original source/team repository: https://github.com/student-anshu/EEG-seizure-detection
-- Develop and verify in the working repository first. Do not modify the original repository automatically.
+- Current working branch: `feature/cross-patient-feature-stability-audit`
+- Original source/team repository: https://github.com/student-anshu/EEG-seizure-detection (do not modify/synchronize automatically).
+- User Windows repository root: `D:\2026-THE ENDGAME\byteBazzar\EEG`
+- Python environment: repository-root `.venv311`, Python 3.11.
+- Nested code directory: `EEG_Seizure_Detection_Phase1\EEG_Seizure_Detection`.
 
-## 2. Research objective
+## Project goal and priority
 
-Academic binary EEG-window seizure detection using CHB-MIT. This is detection of seizure activity in a window, not prediction of a future seizure. It is not a medical device and must not be used for diagnosis or treatment decisions.
+The CTO-approved goal is to complete a working, reproducible EEG seizure-detection application. Do not keep the project blocked by endless accuracy experiments. Preserve and report all actual results and limitations; future accuracy improvement remains a documented research task. Do not launch new training or threshold/feature tuning unless a genuine technical blocker makes it necessary.
 
-Proposed deep-learning architecture: harmonized multichannel EEG → training-fold-only channel selection → 1D CNN → BiLSTM → temporal attention → sigmoid output.
+This is seizure detection, not future seizure prediction. Academic prototype only; not for diagnosis or treatment decisions.
 
-Required comparisons: Logistic Regression, SVM, Random Forest, 1D CNN, CNN+BiLSTM and CNN+BiLSTM+attention. Treat the proposed architecture as a hypothesis to evaluate, not as a proven choice.
+## Current stopping point
 
-## 3. Current verified project foundation
+Research baseline development is paused after:
+- legacy 221-feature LR first-fold baseline;
+- robust 170-feature LR first-fold baseline;
+- first-fold event evaluation for both;
+- 22-patient inner OOF LR and event evaluation;
+- alarm policy exploration;
+- original and fold-aware feature stability audits;
+- patient_13/14/15 contribution diagnostics.
 
-- Primary cohort: 683 recordings, 185 seizure events, 23 independent patients.
-- CHB01 and CHB21 are grouped as one individual.
-- Three incompatible-montage CHB12 recordings are excluded from the primary cohort.
-- Full preprocessing integrity audit: 683/683 valid, 704,836 windows (702,280 normal; 2,556 seizure).
-- 23 outer patient-wise LOPO folds.
-- Nested patient split: 17 fit, 5 validation, 1 outer test.
-- Fold standardization fitted on inner-fit patients only.
-- Feature extractor: 13 features/channel × 17 channels = 221 features/window.
-- Fold-wise feature iterator streams one recording at a time.
-- Baseline utilities and a first-fold runner exist.
-- Scaler and model-stage checkpoint implementations exist; current model-stage verification is pending user confirmation.
+Exact metrics and caveats are in `EXPERIMENT_HISTORY_AND_RESULTS.md`.
 
-See `CURRENT_STATUS.md` for exact current milestone and verification state. Do not use older Phase 0/10-recording descriptions as the current project status.
+The 170-feature robust Logistic Regression is the provisional integration candidate, not a proven winner. The 221-feature model remains the reference. Do not mark the baseline frozen until the saved model, scaler(s), feature order and complete preprocessing/inference contract have been verified.
 
-## 4. Immediate task
+## Immediate task
 
-Current milestone: **Phase 4.5.2 — verify model-stage checkpoint recovery**.
+**Model artifact/inference-readiness audit — no training.**
 
-The user has checked out `feature/model-stage-checkpoints`. On Windows, the repository root is:
+Inspect local `results/baselines`, `cache` and model/checkpoint directories. Verify:
+1. model file exists and deserializes;
+2. all required model scaler(s) exist;
+3. exact feature and channel order;
+4. sampling frequency, filtering, normalization, window length/stride and feature extraction;
+5. inference function uses exactly the training transformations;
+6. threshold and event policy provenance;
+7. a smoke test works on permitted development data or saved features.
 
-`D:\2026-THE ENDGAME\byteBazzar\EEG`
+Write `docs/MODEL_BASELINE_FREEZE.md` with artifact paths, hashes, package versions, input/output contract, reproducibility evidence and limitations. If no deployable checkpoint exists, inspect completed training checkpoints and determine a safe export path. Do not automatically retrain.
 
-The Python 3.11 environment is `.venv311` at the repository root. The project code and tests are nested under:
+Do not use patient_01 for tuning, calibration, feature selection or development. Existing historical outer-test results may be retained as descriptive metrics only.
 
-`EEG_Seizure_Detection_Phase1\EEG_Seizure_Detection`
+## After artifact verification
 
-Run verification from PowerShell in this order:
+1. Freeze a versioned baseline package.
+2. Implement modular FastAPI health, model-info and inference endpoints.
+3. Ensure API preprocessing exactly matches the verified training pipeline.
+4. Define validated request/response schemas and event-level aggregation.
+5. Inspect/reuse the React + Vite + TypeScript dashboard foundation (separate branch `feature/react-dashboard-foundation`, PR #1); it currently uses illustrative mock data and is not connected to real inference.
+6. Integrate frontend with actual backend output and test end to end.
+7. Finish reproducibility, deployment, security and academic documentation.
+
+## Scientific and engineering rules
+
+- Never randomly split overlapping windows across train/test.
+- Never fit scalers, feature selectors, thresholds or hyperparameters on outer-test patients.
+- Do not confuse window metrics with seizure-event metrics.
+- False alarms/hour = false-alarm episodes / non-seizure exposure hours; non-seizure exposure subtracts the union of clipped seizure intervals from recording duration.
+- OOF threshold metrics are not independent test metrics; fold score scales may differ.
+- Do not call the robust model better based only on first-fold results.
+- Do not request EDF redownload/reprocessing; existing processed NPZs/caches remain locally. Verify file presence before use.
+- Do not commit raw EDFs, runtime caches, virtual environments or large model files.
+- Never claim commands/tests were run unless execution output was observed.
+- Distinguish planned, implemented, locally tested, scientifically evaluated and deployed.
+
+## PowerShell startup
 
 ```powershell
-# From repository root
+cd "D:\2026-THE ENDGAME\byteBazzar\EEG"
 .\.venv311\Scripts\Activate.ps1
 python --version
-
 cd .\EEG_Seizure_Detection_Phase1\EEG_Seizure_Detection
-
-python -m py_compile .\modeling\experiment_checkpoints.py .\scripts\run_first_baseline_fold.py
-
-python -m unittest discover -s tests -p "test_experiment_checkpoints.py" -v
-
-python -m unittest discover -s tests -v
+python -m pytest -q
 ```
 
-Expected interpreter is Python 3.11.x. The prompt should show `(.venv311)`, not the separate `(.venv)` environment. Do not run the test commands from repository root because `modeling`, `scripts` and `tests` are below the nested project directory.
-
-Review the actual output before marking this milestone complete. Do not assume the full suite count.
-
-## 5. Checkpoint implementation limits
-
-The first-fold runner checkpoints completed scaler, feature and model stages. It does not serialize an in-progress scikit-learn Logistic Regression solver. If `LogisticRegression(solver="liblinear")` is interrupted during `fit()`, that fit restarts. Once fit returns and its estimator is saved, later stages can reuse it.
-
-The current runner covers only the first LOPO fold. It is not the completed 23-fold runner. Do not claim end-to-end resumability until all folds, fold-result skipping, aggregation and controlled interruption/restart tests are implemented.
-
-## 6. Mandatory research safeguards
-
-1. Never randomly split overlapping windows from the same patient across train/test.
-2. Keep the outer-test patient untouched during scaler fitting, channel/feature selection, hyperparameter tuning and threshold selection.
-3. Fit fold transformations on inner-fit patients only.
-4. Use validation patients for model selection and threshold selection.
-5. Evaluate the held-out outer-test patient only after all choices are frozen.
-6. Report window-level and event-level metrics separately.
-7. Define event matching, nearby-window merging and alarm refractory period before false alarms/hour.
-8. Do not describe fold-standardized band powers as calibrated physical microvolt-squared power.
-9. Distinguish synthetic checks and unit tests from real-EEG performance evidence.
-
-## 7. Required workflow for every code change
-
-1. Read the relevant design document and inspect source/callers.
-2. Explain the issue and expected behavior.
-3. Make the smallest safe change.
-4. Add/update tests, including recovery tests for checkpoint features.
-5. Run focused tests, then the full suite when appropriate.
-6. Record actual command output and test count; never invent or estimate a passing result.
-7. Update `CURRENT_STATUS.md` and `DEVELOPMENT_LOG.md`.
-8. Update `CHANGELOG_FOR_UPSTREAM.md` when changes need to be mirrored.
-9. Tell the user what changed and what remains unverified.
-
-## 8. Resource and data safety
-
-- Do not delete raw EDF data, processed cohort files or required metadata during cleanup.
-- Do not commit raw EDFs, generated caches, virtual environments, logs or large model artifacts.
-- Inspect disk space and existing cache/process state before expensive experiments.
-- Do not launch full-cohort or 23-fold training until recovery tests and resource estimates are reviewed with the user.
-- Preserve PhysioNet CHB-MIT v1.0.0 provenance, DOI `10.13026/C2K01R`, and ODC-By attribution/license requirements.
-
-## 9. Planned work after current milestone
-
-1. Controlled interruption/restart verification for the first-fold runner.
-2. Complete 23-fold baseline runner with per-fold result checkpoints and atomic aggregation.
-3. Classical baseline evaluation (Logistic Regression, SVM, Random Forest).
-4. CNN, CNN-BiLSTM and attention experiments with identical patient-wise splits.
-5. Window/event evaluation and error analysis.
-6. Explainability.
-7. FastAPI integration, then React dashboard integration.
-8. Final reproducibility and submission documentation.
-
-Work one milestone at a time. Explain in beginner-friendly steps and wait for the user's verification before advancing.
+Run focused tests first when making a targeted change. Explain actions in beginner-friendly Hinglish and provide exact commands. Work one milestone at a time and update `CURRENT_STATUS.md`, `DEVELOPMENT_LOG.md` and relevant technical docs after each milestone.
