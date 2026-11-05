@@ -434,3 +434,36 @@ alarms/hour distributions, not only pooled totals. Keep patient_01 outer-test
 scores sealed from all further model, threshold and alarm-policy selection.
 Preserve the v1 and v2 simulation JSON artifacts; do not delete or overwrite
 them.
+
+---
+
+## Patient-grouped inner OOF pipeline — implementation committed, local verification pending (5 November 2026)
+
+The user successfully pulled commit `0b882f9`, ran the OOF scaler-cache tests (**8 passed in 1.43 seconds**), and built the reusable channel-statistics cache for all **608 outer-training recordings / 22 patients**. The builder confirmed `patient_01` outer-test recordings were not opened.
+
+Committed follow-on implementation:
+- `evaluation/oof_scaler_cache.py` now computes compact per-window/per-channel raw standard deviations and reconstructs fold-specific `log_std`; a patient-excluding channel-scale helper has a unit test.
+- `scripts/build_oof_window_std_cache.py` builds resumable per-recording raw-std artifacts from existing processed NPZ files. No EDF download or feature re-extraction is required.
+- `scripts/run_inner_patient_oof.py` builds one fold-specific feature matrix at a time and trains 22 patient-held-out Logistic Regression models. The same 21-patient channel scaler is applied to every recording in that fold; the model-level StandardScaler is fitted on the 21 training patients only.
+- Each fold feature matrix has per-recording progress checkpoints; each completed patient score artifact is committed atomically and reused on restart.
+- `docs/OOF_SCALER_CACHE.md` documents the run sequence and leakage safeguards.
+
+**Important methodological correction:** a shared matrix in which each patient's features were normalized with a different patient-held-out scaler would leak the current fold's held-out patient into the training features. The committed OOF runner instead constructs a separate matrix for each held-out patient, using one common scaler fit on the other 21 patients. Do not run older intermediate versions of the OOF runner.
+
+**Not yet verified locally:** the raw window-std cache, OOF runner, full 22-fold training, and resulting threshold/metrics. The newly expanded focused test file now contains 11 tests; run it before building the raw-std cache.
+
+Next commands from the nested Python project root:
+
+```powershell
+git pull origin feature/threshold-strategy-score-artifacts
+python -m pytest tests/test_oof_scaler_cache.py -q
+python -m scripts.build_oof_window_std_cache --audit ..\\..\\docs\\full_annotation_audit.csv
+```
+
+Inspect `cache/oof_window_std_v1/manifest.json` and verify `complete=true`, `recording_count=608`, and `excluded_outer_test_patient=patient_01` before starting the OOF runner. Then run:
+
+```powershell
+python -m scripts.run_inner_patient_oof --audit ..\\..\\docs\\full_annotation_audit.csv
+```
+
+The OOF run is a substantial 22-model workload. Preserve all caches and score artifacts; do not delete `cache/oof_recording_stats_v1`, `cache/oof_window_std_v1`, `cache/robust_feature_first_fold_v1`, or `cache/oof_patient_scores_v1` while it is running. The pooled window-F2 threshold is provisional because probabilities from separate fold models may differ in calibration. Event-level threshold/false-alarm analysis and score-transfer review are still required before freezing a threshold. No outer-test patient_01 result is part of OOF.
