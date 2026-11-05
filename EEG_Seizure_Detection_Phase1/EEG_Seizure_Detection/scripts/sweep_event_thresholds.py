@@ -100,7 +100,9 @@ def _load_recording_score_data(
     return output
 
 
-def _evaluate_loaded(\n    data: Sequence[dict], threshold: float, *, include_recordings: bool = False\n) -> dict:
+def _evaluate_loaded(
+    data: Sequence[dict], threshold: float, *, include_recordings: bool = False
+) -> dict:
     rows = []
     for item in data:
         predictions = (item["scores"] >= threshold).astype(np.int8)
