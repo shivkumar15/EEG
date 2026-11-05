@@ -21,6 +21,7 @@ from time import perf_counter
 import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -180,7 +181,7 @@ def _models(seed: int):
     return {
         "logistic_regression": Pipeline([
             ("scaler", StandardScaler()),
-            ("classifier", __import__("sklearn.linear_model", fromlist=["LogisticRegression"]).LogisticRegression(
+            ("classifier", LogisticRegression(
                 solver="liblinear", class_weight="balanced", max_iter=1000, random_state=seed
             )),
         ]),
