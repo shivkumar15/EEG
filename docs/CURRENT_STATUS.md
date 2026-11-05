@@ -239,3 +239,53 @@ detection. The 23-fold evaluation remains necessary.
 The local robust-feature result JSON is now confirmed to exist in the user's
 untracked results directory, but its complete contents have not yet been
 reviewed. Preserve it and its companion score/model artifacts.
+
+
+---
+
+## Robust-feature first-fold event evaluation — completed (5 November 2026)
+
+The user pulled commit `b11d696` and ran
+`python -m scripts.evaluate_robust_first_fold_events --audit ..\\..\\docs\\full_annotation_audit.csv`.
+The saved-score evaluation completed successfully:
+
+- `status=completed`; `model_retrained=false`; `features_reextracted=false`.
+- Robust Logistic Regression threshold: read from the completed experiment
+  result and selected using inner-validation F2.
+- Same first-fold split and the same 139 validation / 75 held-out recordings
+  as the legacy event evaluation.
+- Exact recording-duration inventory used; validation non-seizure exposure
+  1,078,457 seconds and outer-test non-seizure exposure 263,536 seconds.
+
+**Inner validation (29 seizure events):**
+- 27 detected, 2 missed; event sensitivity **93.10%**.
+- Mean detection delay: **14.15 seconds**.
+- 1,272 false-alarm episodes; **4.246 false alarms/hour**.
+
+**Held-out patient_01 (11 seizure events):**
+- 4 detected, 7 missed; event sensitivity **36.36%**.
+- Mean detection delay: **36.5 seconds**.
+- 167 false-alarm episodes; **2.281 false alarms/hour**.
+
+**Comparison with legacy Logistic Regression on the same held-out recordings:**
+- Event detections improved from 1/11 to 4/11; sensitivity from 9.09% to
+  36.36% (+27.27 percentage points).
+- Mean delay decreased from 58 to 36.5 seconds.
+- False alarms increased from 40 to 167; false alarms/hour increased from
+  0.546 to 2.281 (approximately 4.2x).
+- Validation also improved: 27/29 versus 19/29 events detected, with 1,272
+  versus 1,327 false alarms and 4.246 versus 4.430 false alarms/hour.
+
+**CTO interpretation:** this is a promising sensitivity improvement on the
+first held-out patient, but it is not an unqualified model win. The increase
+in detected events is accompanied by a substantial false-alarm penalty on
+outer test. Validation performance is encouraging, but one held-out patient
+cannot establish generalization. Do not claim clinical reliability or adopt
+this as the final model yet. Preserve both models and all score artifacts.
+
+**Next action:** inspect the robust and legacy per-event/per-recording
+diagnostics side by side to identify which seizure events were recovered and
+where false alarms increased. Then test the approved alarm smoothing /
+K-of-N and short-gap merging policies using patient-grouped inner OOF data
+only. Keep the outer-test result sealed from further tuning. The complete
+23-fold nested patient-level evaluation remains required.
