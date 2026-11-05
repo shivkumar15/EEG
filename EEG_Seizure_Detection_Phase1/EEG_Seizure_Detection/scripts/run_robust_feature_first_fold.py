@@ -138,14 +138,30 @@ def collect_robust_batch(recordings, split_name: str, scaler, cache_root: Path) 
     for index in range(completed, len(recordings)):
         recording = recordings[index]
         item = load_recording_windows(PROCESSED_DIR, recording)
-        standardized = scaler.transform(item.X)
-        features = extract_robust_features(standardized, item.sfreq)
-        if features.shape != (len(item.y), feature_count) or not np.isfinite(features).all():
-            raise RuntimeError(f"Invalid robust features for {recording.relative_path}")
         next_cursor = cursor + len(item.y)
         if len(item.y) != lengths[index]:
             raise RuntimeError(f"Window count changed for {recording.relative_path}")
-        X[cursor:next_cursor] = features
+
+        # Bound temporary standardized EEG and Welch PSD memory. A recording is
+        # committed to the resumable manifest only after every chunk is written.
+        chunk_size = 256
+        for chunk_start in range(0, len(item.y), chunk_size):
+            chunk_end = min(chunk_start + chunk_size, len(item.y))
+            standardized_chunk = scaler.transform(item.X[chunk_start:chunk_end])
+            features = extract_robust_features(
+                standardized_chunk, item.sfreq, chunk_size=chunk_size
+            )
+            expected_shape = (chunk_end - chunk_start, feature_count)
+            if features.shape != expected_shape or not np.isfinite(features).all():
+                raise RuntimeError(
+                    f"Invalid robust feature chunk for {recording.relative_path} "
+                    f"at windows {chunk_start}:{chunk_end}"
+                )
+            destination_start = cursor + chunk_start
+            destination_end = cursor + chunk_end
+            X[destination_start:destination_end] = features
+            del standardized_chunk, features
+
         y[cursor:next_cursor] = item.y.astype(np.int8, copy=False)
         cursor = next_cursor
         X.flush()
@@ -310,7 +326,7 @@ def main():
     parser.add_argument("--seed", type=int, default=RANDOM_STATE)
     parser.add_argument("--models", nargs="+",
         choices=["logistic_regression", "random_forest"],
-        default=["logistic_regression", "random_forest"])
+        default=["logistic_regression"])
     args = parser.parse_args()
     run(args.audit, args.output, args.seed, args.models)
 
