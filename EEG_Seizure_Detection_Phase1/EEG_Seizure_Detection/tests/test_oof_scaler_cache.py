@@ -140,7 +140,7 @@ def test_exact_fallback_reproduces_original_float32_extractor_for_near_constant_
 
     # Tiny raw variation around zero becomes a small nonzero normalized level
     # after applying a fold mean. Float32 rounding changes the resulting std.
-    ramp = np.linspace(-2e-15, 2e-15, 128, dtype=np.float64)
+    ramp = np.linspace(-2e-15, 2e-15, 256, dtype=np.float64)
     windows = np.stack([ramp, ramp * 0.75])[None, :, :]
     mean = np.array([-5.109097766828098e-10, -2.9123343466072157e-10])
     scale = np.array([5.8258332560013724e-5, 5.46497477406169e-5])
