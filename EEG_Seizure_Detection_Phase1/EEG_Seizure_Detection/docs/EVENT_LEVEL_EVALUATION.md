@@ -66,3 +66,30 @@ The overlap-based match is intentionally transparent and has no extra onset
 tolerance. It does not model clinical seizure alarm requirements, intervention
 latency, or alarm refractory policies. Any alternative matching rule must be
 predeclared, validated on inner patients, and versioned before outer-test use.
+
+
+## First-fold saved-score integration
+
+`scripts/evaluate_first_fold_events.py` evaluates the existing first-fold
+inner-validation and outer-test score checkpoints without fitting or loading a
+new model. It reconstructs the deterministic patient-grouped split, verifies
+the score checkpoint signatures/checksums, and aligns concatenated score
+slices to each recording by comparing saved score labels with the NPZ labels.
+Any length or label mismatch fails closed.
+
+The script reports event counts, event sensitivity, detection delay and
+false-alarm counts for the validation-selected F1 and F2 thresholds. It writes
+per-recording and per-patient summaries to
+`results/baselines/first_fold_patient_01_event_metrics_v1.json`. Since exact
+recording durations are unavailable in the retained cohort, exposure and
+false alarms/hour remain null. This is one outer fold only and is not a
+full-cohort performance estimate.
+
+Run from the `EEG_Seizure_Detection` directory:
+
+```powershell
+python -m scripts.evaluate_first_fold_events --audit ..\\..\\docs\\full_annotation_audit.csv
+```
+
+This is a post-processing/evaluation step over saved scores; it does not
+retrain Logistic Regression or regenerate EEG features.
