@@ -309,3 +309,15 @@ per-recording error analysis. Outer-test diagnostics are post-hoc only and
 must not be used to tune thresholds or alarm policies. Alarm-policy selection
 must use patient-grouped inner validation/OOF predictions, with a frozen
 protocol before any outer-test evaluation.
+
+
+### Legacy-versus-robust error comparison utility added
+
+Added `scripts/compare_first_fold_event_results.py` and
+`tests/test_event_result_comparison.py`. The utility compares the saved
+legacy and robust event-evaluation JSON files by exact recording path and
+seizure annotation identity. It reports events recovered by robust, events
+detected only by legacy, events detected/missed by both, and per-recording
+false-alarm deltas. It is descriptive only: it does not tune thresholds,
+change alarm policies, retrain models, or use the outer-test result for
+selection. User pull and focused test/execution are pending.
