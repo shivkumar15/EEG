@@ -114,6 +114,8 @@ def aggregate_patient_statistics(stats_root, manifest, outer_train):
     patient_states = {}
     for rec in outer_train:
         entry = entries[rec.relative_path]
+        if entry.get("patient_id") != rec.patient_id:
+            raise RuntimeError(f"Patient identity mismatch in stats manifest: {rec.relative_path}")
         artifact = stats_root / "recordings" / entry["artifact"]
         try:
             with np.load(artifact, allow_pickle=False) as saved:
@@ -202,6 +204,8 @@ def build_fold_matrix(
         source_x, source_y, source_start, source_end = row_lookup[rec.relative_path]
         count = source_end - source_start
         entry = std_entries[rec.relative_path]
+        if entry.get("patient_id") != rec.patient_id:
+            raise RuntimeError(f"Patient identity mismatch in raw-std manifest: {rec.relative_path}")
         if int(entry["window_count"]) != count:
             raise RuntimeError(f"Raw std/feature row count mismatch: {rec.relative_path}")
         artifact = std_root / "recordings" / entry["artifact"]
