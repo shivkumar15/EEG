@@ -128,3 +128,38 @@ Current milestone: **4.1 — feature extraction and scientific validation**.
 - Recorded that model-stage compile, focused tests, full regression tests and controlled runner interruption/restart verification still require confirmation from the user's local environment.
 - Corrected the handoff instructions to use the repository-root `.venv311` Python 3.11 environment and run tests from the nested `EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection` directory.
 - No model training was started and no experiment metrics were added.
+
+
+---
+
+## 2026-11-06 — Research baseline handoff and system-completion strategy
+
+### CTO decision
+- Accuracy optimization is paused; the project priority is now a complete, reproducible, honestly evaluated application.
+- Existing model experiments, OOF results and diagnostic audits remain part of the research record. Further accuracy improvement is a future research task, not a blocker for backend/frontend completion.
+- The robust 170-feature Logistic Regression is only a provisional integration candidate. The legacy 221-feature Logistic Regression remains the reference; neither is declared a proven winner.
+- No additional training or tuning is authorized merely to improve metrics. First verify whether an existing saved model/checkpoint can be used reproducibly for inference.
+
+### Documentation created/reconciled
+- Added `docs/EXPERIMENT_HISTORY_AND_RESULTS.md` with the 221-feature and 170-feature first-fold results, event-level metrics, 22-patient OOF results, alarm-policy exploration, feature stability audits, patient contribution diagnostics, artifact paths and scientific caveats.
+- Added `docs/PROJECT_HANDOFF.md` as the authoritative new-chat/developer handoff, including exact stopping point, local environment, file map, next actions and a copy/paste new-chat prompt.
+- Rewrote `docs/CURRENT_STATUS.md`, `docs/AI_HANDOFF.md` and `docs/PROJECT_MASTER_PLAN.md` to remove stale next-step guidance and align the project with the approved system-completion strategy.
+- Updated repository `README.md` so new contributors are directed to the handoff and experiment history first.
+- The user asked that a new ChatGPT session reading the repository should understand what was done, why work paused, and where to resume.
+
+### Next milestone
+- Perform a local, no-training model artifact/inference-readiness audit.
+- Verify the serialized model, model scaler(s), feature/channel order, exact preprocessing contract, threshold provenance and smoke-test inference path.
+- Create `docs/MODEL_BASELINE_FREEZE.md` only after the audit.
+- Then implement FastAPI and connect the React dashboard.
+
+### Verification state
+- Documentation files were written to branch `feature/cross-patient-feature-stability-audit` through GitHub.
+- Documentation commits:
+  - Experiment history: `a94e9f0f5b3e00c1c1a38b0ef3129b33f7c7d086`
+  - Project handoff: `65b1955fdc01945d0bb75375f3005104aa815173`
+  - Current status: `141bd6f1b0fd13970d2ce1f162460715adf17ad9`
+  - AI handoff: `03d83476003d2b275e01fd002b86810523187365`
+  - Master plan: `6777ab130d5957e2a797edfd3d1fe89e86a0dcd6`
+  - README: `f2e745fd4b5051146ecfb374e583cab5a92c9a80`
+- This documentation update did not run local tests, train a model, modify model scores or change dataset artifacts.
