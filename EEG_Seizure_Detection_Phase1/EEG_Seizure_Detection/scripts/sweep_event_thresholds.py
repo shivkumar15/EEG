@@ -100,7 +100,7 @@ def _load_recording_score_data(
     return output
 
 
-def _evaluate_loaded(data: Sequence[dict], threshold: float) -> dict:
+def _evaluate_loaded(\n    data: Sequence[dict], threshold: float, *, include_recordings: bool = False\n) -> dict:
     rows = []
     for item in data:
         predictions = (item["scores"] >= threshold).astype(np.int8)
@@ -109,6 +109,7 @@ def _evaluate_loaded(data: Sequence[dict], threshold: float) -> dict:
             recording_duration_seconds=None, window_seconds=WINDOW_SECONDS,
         )
         recording = item["recording"]
+        metrics.pop("alarms", None)
         rows.append({
             "relative_path": recording.relative_path,
             "subject": recording.subject,
@@ -138,7 +139,7 @@ def _evaluate_loaded(data: Sequence[dict], threshold: float) -> dict:
         "macro_patient_event_f2_proxy": macro_f2,
         "macro_patient_event_sensitivity": macro_sensitivity,
         "seizure_bearing_patient_count": len(seizure_patients),
-        "recordings": rows,
+        "recordings": rows if include_recordings else None,
     }
 
 
@@ -224,10 +225,14 @@ def run_sweep(
     selected = _select_candidate(candidate_rows)
     selected_threshold = float(selected["threshold"])
     # The outer-test set is evaluated once, after selection is frozen.
-    outer_selected = _evaluate_loaded(test_data, selected_threshold)
+    outer_selected = _evaluate_loaded(
+        test_data, selected_threshold, include_recordings=True
+    )
     outer_existing_f1 = _evaluate_loaded(test_data, existing["validation_f1"])
     outer_existing_f2 = _evaluate_loaded(test_data, existing["validation_f2"])
-    validation_selected_detail = _evaluate_loaded(val_data, selected_threshold)
+    validation_selected_detail = _evaluate_loaded(
+        val_data, selected_threshold, include_recordings=True
+    )
 
     result = {
         "experiment": "first_fold_validation_event_threshold_sweep",
