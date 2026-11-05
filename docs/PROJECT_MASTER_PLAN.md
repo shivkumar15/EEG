@@ -2,205 +2,167 @@
 
 **Working repository:** https://github.com/shivkumar15/EEG  
 **Original source repository:** https://github.com/student-anshu/EEG-seizure-detection  
-**Current development stage:** Phase 4 — baseline model workflow and recovery engineering.  
-**Active branch:** `feature/threshold-strategy-score-artifacts`
+**Current branch:** `feature/cross-patient-feature-stability-audit`  
+**Current milestone:** model artifact/inference-readiness audit, then FastAPI backend.
 
-## 1. Research objective
+## 1. Research and product objective
 
-Build an academic binary EEG-window seizure-detection system using the CHB-MIT Scalp EEG Database. The task is **seizure detection in an EEG window**, not prediction of a future seizure. This is a research prototype, not a medical device; it must not be used for diagnosis or treatment decisions.
+Build a complete academic EEG seizure-detection application using the CHB-MIT Scalp EEG dataset. The model detects seizure activity in EEG windows; it does not predict future seizures. This is a research prototype, not a medical device, and must not be used for diagnosis or treatment decisions.
 
-The research question is whether EEG models can detect seizure activity while generalizing to patients not used during model fitting or validation.
+The current delivery priority is a complete, reproducible system. Model accuracy is not ignored: completed results and limitations must remain visible and future improvements documented. However, endless model optimization is no longer a blocker for completing backend, frontend and integration.
 
-## 2. Research architecture
+## 2. Verified dataset and cohort
 
-### Proposed deep-learning model
+- CHB-MIT Scalp EEG Database, PhysioNet v1.0.0, DOI `10.13026/C2K01R`.
+- Full audit: 686 EDF recordings, 198 events, 24 subject folders.
+- Primary cohort: 683 recordings, 185 events, 23 independent patients.
+- CHB01 and CHB21 grouped as the same individual (`patient_01`).
+- Excluded incompatible-montage recordings: CHB12 recordings 27, 28 and 29.
+- Sampling rate 256 Hz; preferred montage 17 channels.
+- 10-second windows with 5-second stride.
+- Full processed cohort: 704,836 windows (702,280 normal, 2,556 seizure), 683/683 valid.
+- Duration inventory matches all 683 primary recordings; non-seizure exposure is duration minus the union of clipped seizure annotations.
 
-EEG preprocessing and channel harmonization → training-fold-only channel selection → multichannel 1D CNN → BiLSTM → temporal attention → Dense sigmoid output.
+The user no longer has the original EDF files locally. Existing processed NPZs, metadata, caches and result artifacts remain. Do not ask for a fresh EDF download or full preprocessing run unless a separately justified future task truly requires it.
 
-This is a proposed architecture and research hypothesis, not an assumed best model. It must be evaluated against simpler baselines and ablations under identical patient-wise splits.
+## 3. Research methodology and safeguards
 
-### Required comparisons
+Preferred research design was 23-fold patient-wise Leave-One-Patient-Out evaluation, with inner patient-grouped fit/validation. No random window-level splitting is permitted because windows overlap and share patient/recording characteristics.
 
-1. Feature-based classical baselines: Logistic Regression, SVM and Random Forest.
-2. 1D CNN.
-3. CNN + BiLSTM.
-4. CNN + BiLSTM + temporal attention.
+- All transforms, feature selection, class weighting, model parameters, thresholds and alarm rules must be selected without the outer-test patient.
+- `patient_01` remains sealed for all future development and tuning. Its historical first-fold test metrics are preserved as a descriptive one-time evaluation.
+- Report window-level and event-level metrics separately.
+- Metrics include sensitivity, specificity, precision, F1/F2, AUROC, AUPRC, confusion counts, event sensitivity, detection delay, false-alarm episodes and false alarms per non-seizure hour.
+- False alarms/hour denominator is exact non-seizure exposure; union overlapping seizure annotations before subtracting.
+- OOF pooled thresholds selected on OOF labels are descriptive/optimistic, not independent test performance. Scores from separately trained folds may not share a calibrated scale.
 
-Keep split definitions, preprocessing rules and evaluation metrics consistent across comparisons. Tune hyperparameters only within training/validation patients. The outer-test patient must remain untouched until final evaluation.
+## 4. Completed model experiments
 
-## 3. Dataset and cohort definition
+The exact feature definitions, runner paths, artifact paths, thresholds, tables and caveats are in [Experiment History and Results](EXPERIMENT_HISTORY_AND_RESULTS.md).
 
-- Source: CHB-MIT Scalp EEG Database, PhysioNet v1.0.0.
-- DOI: `10.13026/C2K01R`.
-- Full archive audit: 686 EDF recordings, 198 seizure events, 24 subject folders, zero annotation parse failures.
-- CHB01 and CHB21 represent the same individual and are grouped as `patient_01`.
-- Three CHB12 recordings are excluded from the primary cohort because of incompatible montage:
-  - `chb12/chb12_27.edf`
-  - `chb12/chb12_28.edf`
-  - `chb12/chb12_29.edf`
-- These excluded recordings contain 13 annotated seizure events.
-- **Primary cohort:** 683 recordings, 185 seizure events, 23 independent patients.
-- All 686 EDF headers were inspected; all have 256 Hz sampling. The preferred 17-channel montage is available in 683/686 recordings.
+### Legacy 221-feature Logistic Regression
+- First-fold model: 13 features/channel × 17 channels, LR.
+- patient_01 outer-test window sensitivity 2.04%; event sensitivity 1/11 (9.09%); 0.546 FA/hour.
+- Retain as historical baseline/reference.
 
-The full audit manifest is `docs/full_annotation_audit.csv`. The three incompatible recordings must remain excluded unless a separately justified harmonization strategy is developed and documented.
+### Robust 170-feature Logistic Regression
+- 10 robust features/channel × 17 channels, LR.
+- patient_01 outer-test window sensitivity 6.80%; event sensitivity 4/11 (36.36%); 2.281 FA/hour.
+- It is a provisional application candidate only; not proven superior.
 
-## 4. Signal and window configuration
+### 22-patient inner OOF
+- 22 held-out-patient folds; 608 recordings; 652,077 windows; patient_01 excluded.
+- At provisional threshold 0.981883: 75/174 events detected (43.10%), 3.501 FA/hour.
+- At 0.5: 162/174 events detected (93.10%), 32.254 FA/hour.
+- Macro AUROC 0.8148, macro AUPRC 0.1419, with large patient variation.
+- Neither operating point meets the exploratory research target ≥90% event sensitivity and ≤1 FA/hour.
 
-- Sampling frequency: 256 Hz.
-- Fixed longitudinal bipolar montage: 17 selected channels.
-- Omit T8-P8 from the primary montage because it is not consistently available under the expected name.
-- Window duration: 10 seconds (2,560 samples).
-- Window stride: 5 seconds (50% overlap).
-- A window is positive when it overlaps a seizure annotation interval.
-- Preserve patient, recording, window start/end, sampling rate, channels and label in metadata.
-- Annotation parsing failures must never silently become non-seizure labels.
+### Feature stability and contribution diagnostics
+- Original and fold-aware feature stability audits completed.
+- Fold-aware audit: 22 folds, 7,480 patient-feature-class rows; median absolute peer-IQR shift 0.5395, p90 1.5141.
+- Patient 13/14/15 model contribution audits completed; directions vary.
+- No feature removal or further tuning justified. Diagnostics are descriptive, not causal.
 
-The preprocessing implementation uses a 0.5–40 Hz Butterworth bandpass and optional 60 Hz notch filtering. At 256 Hz, the 60 Hz notch is below Nyquist. The existing whole-recording median/IQR normalization is offline and non-causal; its suitability and consistency with deployment inference must be explicitly considered.
+## 5. Current model freeze policy
 
-## 5. Verified data preparation
+Accuracy experiments are paused. The 170-feature robust LR is the provisional model candidate for application integration; the legacy 221-feature LR remains the reference. Do not claim the robust model is better overall.
 
-The full-cohort preprocessing integrity audit reported:
+Before calling the model frozen, verify the actual serialized model, all required scaler(s), feature/channel order, preprocessing configuration, inference function, threshold provenance and reproducible smoke test. If the saved model artifact is incomplete, inspect existing completed checkpoints and export safely without retraining. Document the final artifact inventory in `docs/MODEL_BASELINE_FREEZE.md`.
 
-- 683/683 primary-cohort recordings valid.
-- 704,836 windows total.
-- 702,280 normal windows.
-- 2,556 seizure windows.
-- Zero invalid recordings in that integrity audit.
+## 6. System architecture
 
-The audit verifies output structure, metadata and loader consistency. It does not demonstrate model accuracy or clinical usefulness.
+```text
+React + Vite + TypeScript UI
+          |
+     REST / JSON API
+          |
+      FastAPI app
+          |
+   Inference service
+     |           |
+Preprocessing  Model loader
+     |           |
+Feature extraction -> LR model
+          |
+ Event/alarm aggregation
+          |
+ Versioned JSON response
+```
 
-## 6. Evaluation protocol and leakage safeguards
+### Backend
+- Python 3.11.
+- FastAPI + Pydantic.
+- Modular routes, schemas, services and configuration.
+- Model loading at application startup; avoid reloading per request.
+- Validate file type, sample rate, channels, duration and finite signal values.
+- Use exactly the verified training preprocessing and feature pipeline.
+- Provide health, model metadata and inference endpoints.
+- Response includes model version, threshold/config version, window timestamps/scores, detected intervals, event summaries and limitations.
+- Do not describe outputs as diagnosis.
 
-Preferred evaluation: 23-fold Leave-One-Patient-Out (LOPO/LOSO) evaluation with patient-wise inner validation.
+### Frontend
+- React + Vite + TypeScript + Tailwind.
+- Inspect existing `feature/react-dashboard-foundation` branch / PR #1 before reusing. It contains illustrative mock data only and is not connected to a trained model.
+- Dashboard: project status, supported EEG input, signal/channel visualization where feasible, window score timeline, event intervals, model metadata, evaluation metrics and clear research disclaimer.
+- Mock data must be explicitly labelled until connected to actual backend inference.
 
-For each outer fold:
-- One patient is held out for outer testing.
-- The remaining 22 patients are divided into 17 inner-fit patients and 5 validation patients.
-- Fit normalization/scalers using inner-fit patients only.
-- Fit feature/channel selection, class weights and model parameters without outer-test data.
-- Select thresholds and hyperparameters using validation data only.
-- Evaluate once on the held-out outer-test patient using the frozen choices.
+## 7. Execution roadmap
 
-Verified split inspection found 23 outer folds, with every eligible recording tested exactly once and no patient leakage. These inspection checks verify split construction, not model performance.
+### Gate 1 — model artifact/inference readiness (next)
+- Inspect local results/checkpoints/caches.
+- Verify model serialization and scaler(s).
+- Verify exact feature/channel ordering and preprocessing.
+- Verify threshold and alarm policy source.
+- Run smoke test using permitted development data/saved features.
+- Create `MODEL_BASELINE_FREEZE.md`.
+- Freeze only after reproducibility is demonstrated.
 
-**Never randomly split overlapping EEG windows from the same patient across training and testing.** Never fit scalers, channel selectors, thresholds or hyperparameters using the outer-test patient.
+### Gate 2 — FastAPI backend
+- Define supported input format and API contract.
+- Implement health and model-info routes.
+- Implement inference service using the frozen pipeline.
+- Implement event aggregation.
+- Add unit and API integration tests.
+- Validate error cases and preprocessing parity.
 
-## 7. Feature engineering
+### Gate 3 — React frontend
+- Inspect existing dashboard foundation.
+- Build app shell, routing, upload/input flow and results views.
+- Integrate real API responses.
+- Display signal, window scores, event timeline and model metadata.
 
-Current feature extractor produces 13 features per channel:
-1. Mean
-2. Standard deviation
-3. Variance
-4. RMS
-5. Line length
-6. Skewness
-7. Excess kurtosis
-8. Delta power (0.5–4 Hz)
-9. Theta power (4–8 Hz)
-10. Alpha power (8–13 Hz)
-11. Beta power (13–30 Hz)
-12. Gamma power (30–40 Hz)
-13. Spectral entropy
+### Gate 4 — end-to-end integration
+- Known sample inference test.
+- Invalid file, missing channel, wrong sample rate, empty data and non-finite data tests.
+- Performance and memory check.
+- Reproducible setup, demo and deployment guide.
 
-With 17 channels, each window produces 221 features. Welch PSD uses up to 2-second segments, and band powers integrate between configured edges using interpolated PSD values. Synthetic tests have checked pure tones, boundary-near frequencies, a mixed-frequency signal and a noisy alpha signal.
+### Gate 5 — final research/submission package
+- Preserve all experimental results and limitations.
+- Write methods, cohort, preprocessing, model, evaluation and limitations sections.
+- Explain that full 23-fold outer evaluation, deep learning and clinical validation are not complete unless later performed.
+- Accuracy improvement becomes a separate future research roadmap, not a completion blocker.
 
-These synthetic checks validate selected implementation behaviors; they do not establish performance on real EEG. After fold-wise standardization, absolute band-power features must not be described as calibrated physical power in microvolt-squared units.
+## 8. Out of scope for immediate work
 
-## 8. Checkpoint and reproducibility policy
+- More Logistic Regression threshold hunting.
+- Further feature deletion/reversal based on patient diagnostics.
+- More alarm smoothing/grid search.
+- CNN, CNN-BiLSTM, attention or model zoo experiments.
+- New full 23-fold training run solely to increase metrics.
+- Clinical claims or medical-device deployment.
 
-Training/evaluation workflows must:
-- Persist expensive completed units at safe boundaries.
-- Use signatures that identify data, split, preprocessing, feature/model configuration and random seed.
-- Write artifacts atomically and validate integrity before reuse.
-- Reject corrupted or incompatible checkpoints.
-- Preserve run logs and machine-readable manifests.
-- Test interruption and restart behavior.
-- Keep runtime caches and model artifacts out of Git unless explicitly selected as small reports.
+These may be revisited as future research if time and evidence justify them.
 
-The current first-fold implementation includes scaler, feature and model-stage checkpoints. Logistic Regression with the configured `liblinear` solver cannot safely resume an in-progress `fit()`; an interrupted fit restarts. The first-fold runner is not yet the completed 23-fold experiment runner. See:
-- `docs/ML_TRAINING_CHECKPOINT_POLICY.md`
-- `docs/SCALER_CHECKPOINTS.md`
-- `docs/MODEL_STAGE_CHECKPOINTS.md`
+## 9. Engineering and handoff rules
 
-Do not claim end-to-end 23-fold resumability until fold scheduling, durable fold results, aggregation and controlled interruption/restart tests are implemented.
-
-## 9. Current phase status
-
-### Completed / verified
-- Phase 0: initial audit, annotation correctness, preprocessing correctness, data provenance and repository hygiene.
-- Phase 1: full primary-cohort preprocessing and integrity audit.
-- Phase 2: patient-wise LOPO and nested split construction/inspection.
-- Phase 3: fold-wise data preparation, fit-only standardization and feature iteration.
-- Phase 4.1: feature extraction implementation and synthetic signal validation.
-- Phase 4.2: fold-wise feature integration.
-- Phase 4.3: baseline utilities and first-fold preflight.
-- Phase 4.5.1: scaler checkpoint implementation and focused local tests previously reported as passing.
-- Phase 4.5.2: model-stage checkpoint implementation and documentation are present on the active branch. On 5 November 2026, the user reported 136 tests and 4 subtests passing in 3.95 seconds (4 skipped); robust-feature focused tests passed 6/6 in 1.20 seconds. These results confirm the repository regression suite, not an actual long-running interruption/restart. Controlled runner-recovery verification remains pending.
-
-### In progress
-- Verify the current model-stage checkpoint branch using Python 3.11 environment and the correct nested project directory.
-- Add/verify controlled interruption tests for the first-fold runner.
-- Build a complete 23-fold baseline runner with per-fold result reuse, durable aggregation and interruption recovery.
-
-### Not yet completed
-- Full 23-fold classical baseline evaluation and metrics.
-- 1D CNN, CNN-BiLSTM and attention experiments.
-- Final window-level and event-level evaluation.
-- Explainability.
-- FastAPI model inference integration.
-- React integration with a validated model/API.
-- Final submission validation and research report.
-
-## 10. Evaluation outputs to report
-
-At minimum:
-- Sensitivity/recall
-- Specificity
-- Precision
-- F1-score
-- AUROC
-- AUPRC
-- Confusion matrix and class support
-- Per-patient and fold-wise metrics
-- Fold variability and confidence intervals where feasible
-
-Report window-level and event-level performance separately. Before calculating false alarms per hour, define event matching, merging of nearby positive windows and alarm refractory period. Discuss class imbalance and patient variability. Do not present a single aggregate score without its fold/patient context.
-
-## 11. Explainability
-
-Add SHAP or another justified explanation method only after model selection and evaluation are stable. Specify what output is explained, the reference samples, aggregation method and limitations. Explanations are not clinical evidence.
-
-## 12. Application architecture
-
-- Python for signal processing, model development and inference.
-- MNE, NumPy, SciPy, pandas and scikit-learn for the classical pipeline.
-- Select and consistently use one deep-learning framework; TensorFlow/Keras is the current proposal.
-- FastAPI backend with versioned request/response contracts.
-- React + Vite + TypeScript + Tailwind frontend; Plotly for signal and metric charts.
-- Start with file-based experiment metadata/results; add a database only for a concrete requirement.
-- Inference preprocessing must exactly match the validated model's preprocessing.
-- UI language must describe model estimates, not diagnoses.
-
-## 13. Dataset provenance and distribution policy
-
-- Dataset source: [PhysioNet CHB-MIT v1.0.0](https://physionet.org/content/chbmit/1.0.0/).
-- DOI: `10.13026/C2K01R`.
-- PhysioNet lists the Open Data Commons Attribution License v1.0 (ODC-By).
-- ODC-By governs database rights; it does not automatically resolve separate rights in individual contents. This project does not make a blanket legal determination about every recording.
-- Raw EDFs and subject summary files are excluded from the current Git tree. Keep local copies; do not delete the dataset during code cleanup.
-- Do not copy raw EDFs or summaries to the original team repository. Team members should obtain the dataset independently from PhysioNet and preserve attribution/license notices.
-- Earlier Git history contains raw dataset files that were removed from the current tree; no history rewrite was performed.
-
-## 14. Upstream synchronization
-
-Develop and test in `shivkumar15/EEG` first. Synchronize to `student-anshu/EEG-seizure-detection` only after the working version is stable and the user explicitly proceeds. Back up the original code, review diffs, preserve the dataset, and exclude virtual environments, processed outputs, logs and caches. Verify tests and `python main.py --inspect` in the upstream checkout before claiming synchronization.
-
-## 15. Working rules
-
-1. Read the current status and relevant design docs before code changes.
-2. Work one milestone at a time and wait for user verification before moving on.
-3. Explain the issue and expected behavior before modifying code.
-4. Make the smallest safe change and add tests.
-5. Record exact commands and actual test output.
-6. Update `CURRENT_STATUS.md` and `DEVELOPMENT_LOG.md` after milestones.
-7. Keep planned, implemented, locally tested, scientifically validated and deployed work clearly distinguished.
+1. Read [Project Handoff](PROJECT_HANDOFF.md) and [Current Status](CURRENT_STATUS.md) before code changes.
+2. Inspect the actual source, tests and local artifact availability; do not infer from filenames alone.
+3. Do not retrain automatically.
+4. Do not delete processed data, caches or checkpoints during cleanup.
+5. Do not ask the user to download EDFs again as a default step.
+6. Make small, tested changes and work one milestone at a time.
+7. Record exact commands and observed outputs; never invent results.
+8. Update current status, development log and relevant docs after each milestone.
+9. Keep active working repository separate from original team repository; do not sync upstream without explicit approval.
+10. Use beginner-friendly Hinglish and exact PowerShell commands when guiding the user.
