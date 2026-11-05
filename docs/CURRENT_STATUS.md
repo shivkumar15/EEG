@@ -209,3 +209,33 @@ tests and execute the v2 saved-score evaluator locally. Do not claim these
 tests or the real saved-score evaluation have passed until their output is
 reviewed. The robust-feature result JSON remains a local, untracked artifact;
 the console summary alone is insufficient to audit its complete metrics.
+
+
+### Local verification completed — exact-duration event evaluation v2 (5 November 2026)
+
+The user pulled commit `63659b4`, ran the focused test suite, and executed
+the saved-score evaluator successfully:
+
+- Focused tests: **31 passed in 4.78 seconds**.
+- Evaluator status: completed; `model_retrained=false`.
+- Duration join: 686 inventory rows, 683/683 primary-cohort matches, 3
+  non-cohort inventory rows; no missing primary recordings.
+- Inner validation: 29 seizure events, 19 detected, 10 missed; event
+  sensitivity 65.52%; mean detection delay 15.74 seconds; 1,327 false-alarm
+  episodes over 1,078,457 seconds non-seizure exposure; **4.430 false
+  alarms/hour**.
+- Held-out patient_01 outer test: 11 seizure events, 1 detected, 10 missed;
+  event sensitivity **9.09%**; mean detection delay 58 seconds; 40 false-alarm
+  episodes over 263,536 seconds non-seizure exposure; **0.546 false
+  alarms/hour**.
+
+Interpretation: the event-level generalization result is poor. The lower
+outer-test false-alarm rate does not compensate for missing 10 of 11 seizures.
+This first fold is a warning about patient-level transfer, not evidence of
+clinical readiness or final cohort performance. Keep the legacy model as a
+research baseline; do not claim that the system is reliable for seizure
+detection. The 23-fold evaluation remains necessary.
+
+The local robust-feature result JSON is now confirmed to exist in the user's
+untracked results directory, but its complete contents have not yet been
+reviewed. Preserve it and its companion score/model artifacts.
