@@ -70,14 +70,14 @@ class DurationBackfillTests(unittest.TestCase):
             [self.recording], dataset_dir=self.dataset,
             processed_dir=self.processed, header_reader=self.reader,
         )
-        with patch(
-            "scripts.backfill_recording_durations._read_edf_header",
-            side_effect=AssertionError("header should not be reread"),
-        ):
-            second = backfill_recording_durations(
-                [self.recording], dataset_dir=self.dataset,
-                processed_dir=self.processed,
-            )
+        def unexpected_header_read(path):
+            raise AssertionError("header should not be reread for an unchanged EDF")
+
+        second = backfill_recording_durations(
+            [self.recording], dataset_dir=self.dataset,
+            processed_dir=self.processed,
+            header_reader=unexpected_header_read,
+        )
         self.assertEqual(first["updated"], 1)
         self.assertEqual(second["skipped_valid"], 1)
 
