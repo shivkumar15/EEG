@@ -123,3 +123,50 @@ Separate branch: `feature/react-dashboard-foundation`. Open PR #1: https://githu
 - It evaluates 121 score-quantile candidates from 0.95 to 1.00 plus the existing validation F1/F2 thresholds. Selection uses only inner-validation seizure-bearing patient macro event F2 proxy. The proxy uses detected events divided by detected events plus false-alarm episodes as precision; it is explicitly not false alarms/hour.
 - After freezing the validation-selected threshold, the script evaluates the outer-test patient for descriptive comparison only. The outer-test labels do not participate in selection.
 - Output: `results/baselines/first_fold_event_threshold_sweep_v1.json`. User pull, tests and execution are pending.
+
+
+---
+
+## CTO decision update — approved next work (5 November 2026)
+
+The following is the current execution direction and supersedes earlier roadmap/status text that says exact recording durations are unavailable.
+
+### Verified discovery: recording durations are available
+
+A direct GitHub-side audit matched `docs/signal_inventory.csv` against the 683 primary-cohort recordings from `docs/full_annotation_audit.csv`:
+
+- 683/683 primary recordings matched.
+- 0 missing, invalid or internally inconsistent duration records.
+- Each duration agrees with `n_samples / sampling_frequency_hz` within 0.01 seconds.
+- Total raw primary-cohort recording exposure: 979.9286 hours.
+
+The historical NPZ duration audit remains correct (duration is absent from those NPZs), but the separate inventory file supplies the exact duration. **Next code task:** join the inventory by recording identity and use exact durations to calculate non-seizure exposure and false alarms/hour. Do not restore or reprocess EDF files for this purpose. The inventory total is raw recording time; subtract the union of annotated seizure intervals per recording before computing non-seizure FA/hour.
+
+### Decisions adopted from the external checklist
+
+1. Build a reusable, deterministic feature cache with patient ID, recording ID, window start, label, feature version and source signature. Prefer partitioned Parquet or memory-mapped NumPy arrays, not one monolithic CSV. Parallelize per recording only after measuring memory and limiting workers.
+2. Create a scale-free feature core: relative five-band powers, spectral entropy, skewness, excess kurtosis and normalized line length. Test `log_std` as a separate amplitude ablation.
+3. Compare per-channel features with pooled channel median/IQR and their combination. Test maximum pooling separately due to noisy-channel sensitivity.
+4. Use patient-grouped inner out-of-fold predictions for model selection. Verify seizure-bearing patient/event support per fold; do not assume window stratification alone balances patients.
+5. Tune Logistic Regression `C` on a logarithmic grid. Compare class-only, patient-only and combined training weights. Use one tree challenger; Random Forest is already implemented and is the first candidate. Defer a model zoo and do not start with SMOTE.
+6. Compare rolling score smoothing (3–6 windows), K-of-N alarm rules and short-gap merging on inner OOF data only. Report the delay cost.
+7. Select/report sensitivity at predeclared false-alarm budgets (0.1, 0.5, 1.0 FA/hour as research operating points), with no clinical-safety implication.
+8. Complete all 23 nested outer LOPO folds after freezing the method. Report per-patient event sensitivity, FA/hour, delay, AUROC, AUPRC and window metrics, plus patient-macro median/IQR/mean.
+9. Defer trailing-baseline normalization and Siena external validation. Learning curves are optional.
+10. API/dashboard work may prepare a clearly labelled baseline interface in parallel, but real inference must use the frozen, validated preprocessing/model pipeline and must not be described as diagnosis.
+
+### Important methodological safeguards
+
+- Preserve the existing 221-feature Logistic Regression baseline and its saved artifacts as the comparison reference.
+- The current 170-feature robust representation includes `log_std` and is extracted after fold-fitted channel standardization. It is not identical to the proposed scale-free core. Create a new version or explicit ablation; do not silently change feature semantics or reuse incompatible caches.
+- Any model-level scaler is fitted inside each training fold only.
+- All feature/model/weighting/calibration/threshold/alarm choices are made using inner training/OOF data. Outer-test labels are used once for final evaluation only.
+- Thresholds selected from OOF scores may not transfer to a final refit on all 22 outer-training patients. Validate score calibration/transfer using inner data and freeze the protocol before outer-test scoring.
+- The patient_01 threshold curve is a post-hoc diagnostic only; it must never be used to tune the model or threshold.
+- Current first-fold baseline and threshold-sweep findings remain exploratory; no 23-patient performance claim is established.
+
+### Immediate next action
+
+Implement and test duration integration into `scripts/evaluate_first_fold_events.py` (or a reusable inventory loader) first. Then review the running robust-feature experiment's actual completion/result before launching any new expensive job. Preserve current checkpoints and caches. The reusable feature cache and patient-grouped OOF pipeline follow after these two gates.
+
+See [Accuracy Improvement Roadmap](ACCURACY_IMPROVEMENT_ROADMAP.md) for the full approved sequence and [Event-Level Evaluation](../EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/docs/EVENT_LEVEL_EVALUATION.md) for event metric semantics.
