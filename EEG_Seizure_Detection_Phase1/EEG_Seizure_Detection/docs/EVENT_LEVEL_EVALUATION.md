@@ -29,14 +29,16 @@ alarm system.
 
 ## Exact recording duration is mandatory
 
-Newly processed NPZ files now persist `recording_duration_seconds` from the
+Newly processed NPZ files persist `recording_duration_seconds` from the
 actual loaded signal sample count divided by sampling frequency, and the
-metadata CSV repeats this value for integrity checks. The event evaluator
-requires `recording_duration_seconds` explicitly. The 683 existing processed
-NPZ files predate this field, so they must be backfilled from EDF headers or
-reprocessed before event-level false-alarm rates are computed. The last
-complete window end is only a lower bound because a trailing partial window
-may exist. Do **not** use that lower bound as the false-alarm-rate denominator.
+metadata CSV repeats this value. For existing artifacts, the restartable
+`scripts/backfill_recording_durations.py` reads EDF headers with `preload=False`
+and writes the exact duration to each aligned metadata CSV plus the central
+`processed/recording_durations.json` manifest. It deliberately does not rewrite
+the large NPZ archives. The event evaluator requires `recording_duration_seconds`
+explicitly. The last complete window end is only a lower bound because a
+trailing partial window may exist. Do **not** use that lower bound as the
+false-alarm-rate denominator.
 
 ## Matching and aggregation
 
