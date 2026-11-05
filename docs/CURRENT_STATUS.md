@@ -379,3 +379,58 @@ The simulation was corrected in v2:
 Commits: script 54797174750abd2f21a934700bff439580ed5f4a; tests d60ba559b086ffd771fd1dd209f7613bd42eb392.
 
 Verification pending: user must pull, run python -m pytest tests/test_alarm_policy_simulation.py -q, and execute python -m scripts.simulate_validation_alarm_policies. The corrected output is results/baselines/robust_validation_alarm_policy_simulation_v2.json. Do not cite v1 policy metrics as validated findings.
+
+
+---
+
+### Alarm-policy simulation v2 — locally verified (5 November 2026)
+
+The user pulled commit `b464740`, ran the corrected focused tests, and executed the validation-only simulation:
+
+- Focused tests: **7 passed in 0.07 seconds**.
+- Simulation: `status=completed`, `model_retrained=false`,
+  `outer_test_read=false`, **24/24 combinations completed**.
+- Output: `results/baselines/robust_validation_alarm_policy_simulation_v2.json`.
+- The output is based on the robust first-fold inner-validation recordings only
+  (29 seizure events across the seizure-bearing validation patients). No model
+  was retrained and the held-out patient_01 outer-test data was not read.
+
+**Results by minimum retained alarm duration (all gap settings within a
+minimum-duration row have identical event detections and delay):**
+
+| Minimum duration | Events detected | Event sensitivity | Delay (mean seconds) | FA/hour at 0s gap | FA/hour at 30s gap |
+|---:|---:|---:|---:|---:|---:|
+| 0 s | 27/29 | 93.10% | 14.15 | 4.246 | 2.701 |
+| 15 s | 25/29 | 86.21% | 15.24 | 2.267 | 1.505 |
+| 20 s | 18/29 | 62.07% | 14.44 | 1.188 | 0.751 |
+| 30 s | 10/29 | 34.48% | 24.20 | 0.624 | 0.404 |
+
+Gap merging reduces counted false-alarm episodes/hour without changing event
+sensitivity or delay in this evidence-preserving simulation. Minimum-duration
+filtering reduces false alarms but also discards genuine event detections:
+15 seconds loses 2 of 27 detections, 20 seconds loses 9, and 30 seconds loses
+17. The 30-second filter is especially damaging to sensitivity.
+
+**Research-target check:** none of the 24 combinations simultaneously reaches
+the aspirational target of at least 90% event sensitivity and no more than
+1.0 false alarm/hour. With no duration filter, sensitivity is 93.10% but the
+best FA rate is 2.701/hour. At 20 seconds and a 30-second merge gap, FA rate
+falls to 0.751/hour but sensitivity is only 62.07%.
+
+**CTO decision:** do not adopt a minimum-duration filter or declare an alarm
+policy winner from this experiment. A 30-second gap setting is a candidate
+for further validation because it reduces episode counts without sacrificing
+detections in this simulation, but it remains exploratory and depends on the
+defined alarm-episode semantics. The 15/20/30-second filters are not acceptable
+as default choices based on this evidence because of their sensitivity cost.
+These results cover one first-fold validation partition and only its
+seizure-bearing patients; they are not a substitute for patient-grouped inner
+OOF evaluation across the outer-training cohort.
+
+**Next action:** move toward patient-grouped inner OOF score generation for
+the robust feature candidate, then evaluate the predeclared alarm policies on
+those OOF predictions. Report patient-level event sensitivity and false
+alarms/hour distributions, not only pooled totals. Keep patient_01 outer-test
+scores sealed from all further model, threshold and alarm-policy selection.
+Preserve the v1 and v2 simulation JSON artifacts; do not delete or overwrite
+them.
