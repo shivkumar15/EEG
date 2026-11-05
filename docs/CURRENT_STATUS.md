@@ -60,7 +60,7 @@ Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached
 
 **Known limitation:** an interrupted `LogisticRegression(solver="liblinear")` fit must restart from the beginning; the solver does not provide a supported mid-fit continuation mechanism. Checkpoints preserve completed stages, not an in-progress solver state.
 
-**Verification state (5 November 2026):** the active branch `feature/threshold-strategy-score-artifacts` is 19 commits ahead of `feature/model-stage-checkpoints` and includes the model-stage checkpoint implementation. The user reports the complete repository test suite passing: 136 passed, 4 subtests passed, 4 skipped, in 3.95 seconds. The robust feature extraction tests also pass: 6/6 in 1.20 seconds. These are local software-test results; they do not validate model accuracy or prove an actual long-running process can resume from a real interruption. A controlled runner interruption/restart test remains pending. Do not start an expensive full-data experiment until runtime and recovery gates are reviewed.
+**Verification state (5 November 2026):** the active branch `feature/threshold-strategy-score-artifacts` is 19 commits ahead of `feature/model-stage-checkpoints` and includes the model-stage checkpoint implementation. The user reports the complete repository test suite passing after the event-evaluation changes: **147 passed, 4 subtests passed, 4 skipped, 0 failures, in 3.43 seconds**. The focused event and saved-window tests passed **12/12 in 2.14 seconds**. These are local software-test results; they do not validate model accuracy or prove an actual long-running process can resume from a real interruption. The robust feature extraction tests also pass: 6/6 in 1.20 seconds. These are local software-test results; they do not validate model accuracy or prove an actual long-running process can resume from a real interruption. A controlled runner interruption/restart test remains pending. Do not start an expensive full-data experiment until runtime and recovery gates are reviewed.
 
 ## Event-level evaluation foundation — implementation started
 
@@ -68,16 +68,15 @@ Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached
 - Added deterministic synthetic tests in `tests/test_event_metrics.py`.
 - Added `docs/EVENT_LEVEL_EVALUATION.md` to freeze version-1 semantics.
 - Newly processed NPZ and metadata files now store exact EDF recording duration. Existing 683 NPZ artifacts predate this field; do not calculate false alarms/hour from their last complete window end.
-- **Local verification is pending:** the new event tests and duration-artifact test have been committed but have not yet been run by the user.
+- **Local verification complete (5 November 2026):** focused event + saved-window tests 12/12 passed in 2.14 seconds; full suite 147 passed, 4 subtests passed, 4 skipped, 0 failures, in 3.43 seconds.
 
 ## Immediate next actions
 
-1. Pull the latest branch and run the new focused event/duration tests.
-2. Fix any failures and rerun the full regression suite.
-3. Implement a safe, restartable backfill of exact EDF durations for existing processed NPZ files (header-only read where supported); verify coverage before event scoring.
-4. Integrate event evaluation into the first-fold runner, retaining recording identity, timestamps and exact duration in each score artifact.
-5. Add patient-level event summaries and per-event error tables.
-6. Profile representative feature/scaler stages and validate recovery before authorizing any model training.
+1. Implement a safe, restartable exact-duration backfill for existing processed recordings using EDF header-only reads; preserve existing NPZ contents and record duration in aligned metadata/manifest artifacts.
+2. Add focused tests for interrupted/resumed backfill, existing-duration validation, metadata alignment and missing/corrupt EDF handling.
+3. Integrate event evaluation into the first-fold runner, retaining recording identity, timestamps and exact duration in each score artifact.
+4. Add patient-level event summaries and per-event error tables.
+5. Profile representative feature/scaler stages and validate recovery before authorizing any model training.
 
 ## Not yet completed
 
