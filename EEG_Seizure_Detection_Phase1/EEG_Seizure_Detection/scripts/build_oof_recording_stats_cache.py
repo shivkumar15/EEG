@@ -22,7 +22,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import PROCESSED_DIR
+from config import PROCESSED_DIR, PREFERRED_CHANNELS
 from data_management.cohort import filter_primary_cohort
 from data_management.dataset_split import build_lopo_folds
 from data_management.fold_data import load_recording_windows, processed_path_for_recording
@@ -78,8 +78,8 @@ def build(audit_path: Path, cache_root: Path) -> dict:
                     valid = (
                         str(saved["signature"].item()) == signature
                         and int(saved["count"]) > 0
-                        and saved["mean"].shape == (17,)
-                        and saved["m2"].shape == (17,)
+                        and saved["mean"].shape == (len(PREFERRED_CHANNELS),)
+                        and saved["m2"].shape == (len(PREFERRED_CHANNELS),)
                         and np.isfinite(saved["mean"]).all()
                         and np.isfinite(saved["m2"]).all()
                         and np.all(saved["m2"] >= 0)
@@ -120,7 +120,7 @@ def build(audit_path: Path, cache_root: Path) -> dict:
         "excluded_outer_test_patient": fold.test_patient_id,
         "training_patient_ids": sorted(train_patients),
         "recording_count": len(entries),
-        "channel_count": 17,
+        "channel_count": len(PREFERRED_CHANNELS),
         "statistics": "raw_processed_window_population_count_mean_m2",
         "entries": entries,
         "complete": len(entries) == len(fold.train_recordings),
