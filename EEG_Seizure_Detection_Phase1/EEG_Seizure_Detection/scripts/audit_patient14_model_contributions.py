@@ -169,7 +169,7 @@ def contribution_summary(transformed: np.ndarray, coefficients: np.ndarray,
     }
 
 
-def run(audit_path: Path, patient: str = patient) -> dict:
+def run(audit_path: Path, patient: str = PATIENT) -> dict:
     from config import PREFERRED_CHANNELS
 
     recordings = filter_primary_cohort(load_recording_manifest(audit_path))
