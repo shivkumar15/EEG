@@ -1,8 +1,8 @@
 """Event-level seizure detection metrics and alarm post-processing.
 
-This module intentionally accepts binary window predictions and an explicit
-recording duration. Threshold selection belongs to inner validation; this
-module must never choose a threshold from evaluation labels.
+Exact recording duration is optional for event matching but mandatory for
+exposure-based false-alarms/hour. Threshold selection belongs to inner
+validation; this module never chooses a threshold from evaluation labels.
 """
 from __future__ import annotations
 
@@ -46,12 +46,14 @@ def parse_seizure_intervals(values: Iterable[str]) -> tuple[TimeInterval, ...]:
 
 def _validate_intervals(
     intervals: Sequence[TimeInterval | tuple[float, float]],
-    recording_duration_seconds: float,
+    recording_duration_seconds: float | None,
     name: str,
 ) -> tuple[TimeInterval, ...]:
-    duration = float(recording_duration_seconds)
-    if not np.isfinite(duration) or duration <= 0:
-        raise ValueError("Recording duration must be finite and positive")
+    duration = None
+    if recording_duration_seconds is not None:
+        duration = float(recording_duration_seconds)
+        if not np.isfinite(duration) or duration <= 0:
+            raise ValueError("Recording duration must be finite and positive")
     result = []
     for index, item in enumerate(intervals, start=1):
         try:
@@ -60,7 +62,7 @@ def _validate_intervals(
             )
         except (TypeError, IndexError, ValueError) as exc:
             raise ValueError(f"Invalid {name} interval #{index}: {item!r}") from exc
-        if interval.end > duration + 1e-9:
+        if duration is not None and interval.end > duration + 1e-9:
             raise ValueError(
                 f"{name} interval #{index} ends after recording duration "
                 f"({interval.end} > {duration} seconds)"
@@ -73,7 +75,7 @@ def windows_to_alarms(
     window_starts_seconds: Sequence[float] | np.ndarray,
     predictions: Sequence[int] | np.ndarray,
     *,
-    recording_duration_seconds: float,
+    recording_duration_seconds: float | None = None,
     window_seconds: float = 10.0,
     merge_gap_seconds: float = 0.0,
 ) -> tuple[TimeInterval, ...]:
@@ -84,13 +86,16 @@ def windows_to_alarms(
     """
     starts = np.asarray(window_starts_seconds, dtype=np.float64)
     predicted = np.asarray(predictions)
-    duration = float(recording_duration_seconds)
+    duration = (
+        None if recording_duration_seconds is None
+        else float(recording_duration_seconds)
+    )
     window = float(window_seconds)
     gap = float(merge_gap_seconds)
 
     if starts.ndim != 1 or predicted.ndim != 1 or starts.shape != predicted.shape:
         raise ValueError("Window starts and predictions must be aligned 1D arrays")
-    if not np.isfinite(duration) or duration <= 0:
+    if duration is not None and (not np.isfinite(duration) or duration <= 0):
         raise ValueError("Recording duration must be finite and positive")
     if not np.isfinite(window) or window <= 0:
         raise ValueError("Window duration must be finite and positive")
@@ -102,7 +107,9 @@ def windows_to_alarms(
         raise ValueError("Window starts must be strictly increasing")
     if not np.isin(predicted, (0, 1, False, True)).all():
         raise ValueError("Window predictions must be binary (0 or 1)")
-    if len(starts) and np.any(starts + window > duration + 1e-9):
+    if duration is not None and len(starts) and np.any(
+        starts + window > duration + 1e-9
+    ):
         raise ValueError("A window extends beyond the supplied recording duration")
 
     positive_intervals = [
@@ -150,7 +157,7 @@ def evaluate_recording_events(
     predictions: Sequence[int] | np.ndarray,
     seizure_intervals: Sequence[TimeInterval | tuple[float, float]],
     *,
-    recording_duration_seconds: float,
+    recording_duration_seconds: float | None = None,
     window_seconds: float = 10.0,
     merge_gap_seconds: float = 0.0,
 ) -> dict:
@@ -159,9 +166,13 @@ def evaluate_recording_events(
     An annotated event is detected when at least one alarm overlaps it.
     Detection delay is max(0, first_overlapping_alarm.start - event.start).
     An alarm is a false alarm only when it overlaps no annotated seizure.
-    False alarms/hour uses non-seizure recording hours as its denominator.
+    Exact recording duration is required only to calculate non-seizure
+    exposure and false alarms/hour. Without it those fields are null.
     """
-    duration = float(recording_duration_seconds)
+    duration = (
+        None if recording_duration_seconds is None
+        else float(recording_duration_seconds)
+    )
     seizures = _validate_intervals(
         seizure_intervals, duration, "Seizure"
     )
@@ -187,7 +198,10 @@ def evaluate_recording_events(
         not any(_overlaps(alarm, event) for event in seizures)
         for alarm in alarms
     )
-    non_seizure_seconds = max(0.0, duration - _union_duration(seizures))
+    non_seizure_seconds = (
+        max(0.0, duration - _union_duration(seizures))
+        if duration is not None else None
+    )
     event_count = len(seizures)
     detected_count = event_count - missed_events
     return {
@@ -205,7 +219,10 @@ def evaluate_recording_events(
         ),
         "alarm_count": len(alarms),
         "false_alarm_count": int(false_alarm_count),
-        "non_seizure_duration_seconds": float(non_seizure_seconds),
+        "non_seizure_duration_seconds": (
+            float(non_seizure_seconds)
+            if non_seizure_seconds is not None else None
+        ),
         "false_alarms_per_hour": (
             float(false_alarm_count / (non_seizure_seconds / 3600.0))
             if non_seizure_seconds > 0 else None
@@ -226,8 +243,13 @@ def aggregate_event_metrics(recording_results: Sequence[dict]) -> dict:
     detected = sum(int(item["detected_events"]) for item in recording_results)
     missed = sum(int(item["missed_events"]) for item in recording_results)
     false_alarms = sum(int(item["false_alarm_count"]) for item in recording_results)
-    non_seizure_seconds = sum(
-        float(item["non_seizure_duration_seconds"]) for item in recording_results
+    exposure_values = [
+        item["non_seizure_duration_seconds"] for item in recording_results
+    ]
+    exposure_complete = all(value is not None for value in exposure_values)
+    non_seizure_seconds = (
+        sum(float(value) for value in exposure_values)
+        if exposure_complete else None
     )
     delays = [
         float(item["mean_detection_delay_seconds"])
@@ -254,6 +276,7 @@ def aggregate_event_metrics(recording_results: Sequence[dict]) -> dict:
         "non_seizure_duration_seconds": non_seizure_seconds,
         "false_alarms_per_hour": (
             false_alarms / (non_seizure_seconds / 3600.0)
-            if non_seizure_seconds > 0 else None
+            if non_seizure_seconds is not None and non_seizure_seconds > 0
+            else None
         ),
     }
