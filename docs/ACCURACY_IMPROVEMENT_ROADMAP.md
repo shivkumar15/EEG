@@ -302,3 +302,22 @@ Prepare the API contract and dashboard against a clearly labelled saved baseline
 7. Freeze the pipeline, complete 23 outer folds, and then integrate the validated inference pipeline.
 
 Time-box engineering and classical experiments, but do not trade away leakage safeguards or required outer-fold coverage to meet a calendar target. A negative or inconclusive result is a valid research outcome.
+
+
+## Execution update — 5 November 2026
+
+**Duration-inventory integration is implemented and committed; local verification is pending.**
+The saved-score first-fold evaluator now joins exact recording durations from
+`docs/signal_inventory.csv` using normalized recording identity, validates
+duration arithmetic, clips seizure annotations to recording bounds, and
+calculates per-recording, patient-pooled and cohort-pooled FA/hour using
+non-seizure exposure. The previous v1 result remains unchanged; v2 is written
+to a separate output path. Focused tests were added for joins, integrity
+failures, overlapping annotation union, zero exposure and FA/hour aggregation.
+
+Next:
+1. Pull the branch and run focused tests plus the v2 saved-score evaluation.
+2. Review the completed robust-feature JSON artifact (not committed; keep its
+   cache/checkpoints intact).
+3. Design the reusable scale-free feature cache only after those two review
+   gates are closed.
