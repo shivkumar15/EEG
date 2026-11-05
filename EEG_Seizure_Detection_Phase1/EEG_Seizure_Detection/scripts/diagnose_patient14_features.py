@@ -30,9 +30,6 @@ from data_management.cohort import filter_primary_cohort
 from data_management.dataset_split import build_lopo_folds
 from data_management.fold_data import load_recording_windows
 from data_management.patient_mapping import load_recording_manifest
-from evaluation.oof_scaler_cache import (
-    aggregate_patient_statistics if False else None,
-)
 from feature_selection.robust_feature_extraction import (
     ROBUST_FEATURE_NAMES, extract_robust_features,
 )
