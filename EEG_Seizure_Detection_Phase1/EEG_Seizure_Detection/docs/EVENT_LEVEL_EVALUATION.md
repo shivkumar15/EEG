@@ -36,9 +36,12 @@ metadata CSV repeats this value. For existing artifacts, first run the read-only
 in NPZ files, aligned metadata CSVs and `processed/recording_durations.json`.
 The original EDF dataset is currently unavailable in the working copy, so the
 EDF-header backfill utility cannot be used unless the source files are restored.
-If no exact duration survives, event sensitivity, event counts and detection
-delay can still be reported from the annotation manifest and window timestamps;
-false alarms/hour must be `null` because total non-seizure exposure is unknown.
+If no exact duration survives, event sensitivity, event counts, detection delay
+and false-alarm counts can still be reported from the annotation manifest and
+window timestamps. The evaluator accepts a missing duration for these metrics.
+In that case non-seizure exposure and false alarms/hour are `null`; pooled
+false alarms/hour is also `null` if any included recording lacks exact exposure.
+Never substitute the last complete window end as the recording duration.
 The last complete window end is only a lower bound because a trailing partial
 window may exist. Do **not** use that lower bound as the false-alarm-rate
 denominator.
@@ -51,9 +54,11 @@ detect both; alarm-merging parameters must be frozen and reported. A false
 alarm is an alarm with no overlap with any seizure event.
 
 `aggregate_event_metrics` pools event counts and non-seizure exposure across
-recordings. Compute patient-macro metrics separately by first aggregating
-recordings within each canonical patient; do not treat recording-level values
-as independent patients.
+recordings. If any recording has unknown exposure, pooled exposure and pooled
+false alarms/hour are `null`, while event counts, event sensitivity and false-
+alarm counts remain available. Compute patient-macro metrics separately by
+first aggregating recordings within each canonical patient; do not treat
+recording-level values as independent patients.
 
 ## Limitations
 
