@@ -36,3 +36,24 @@ def test_contribution_summary_rejects_noncontiguous_recording_offsets():
 
     with pytest.raises(RuntimeError, match="contiguous"):
         contribution_summary(X, coef, 0.0, labels, offsets, PREFERRED_CHANNELS)
+
+
+
+def test_channel_feature_contributions_identify_channel_specific_directions():
+    from scripts.audit_patient14_model_contributions import contribution_summary
+
+    channels = PREFERRED_CHANNELS
+    X = np.zeros((2, len(channels) * len(FEATURE_NAMES)), dtype=float)
+    labels = np.array([1, 0], dtype=np.int8)
+    coef = np.ones(X.shape[1], dtype=float)
+    # Make the first channel's log_std contribution lower for the positive row.
+    X[0, 0] = -2.0
+    X[1, 0] = 1.0
+    offsets = [{"relative_path": "chb14/example.edf", "start": 0, "end": 2}]
+
+    result = contribution_summary(X, coef, 0.0, labels, offsets, channels)
+    rows = result["channel_feature_contributions"]
+    first = next(row for row in rows if row["channel"] == channels[0]
+                 and row["feature"] == "log_std")
+    assert first["positive_minus_negative"] == -3.0
+    assert len(rows) == len(channels) * len(FEATURE_NAMES)
