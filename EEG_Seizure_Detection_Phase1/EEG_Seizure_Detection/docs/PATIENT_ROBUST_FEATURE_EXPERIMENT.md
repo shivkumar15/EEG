@@ -53,3 +53,45 @@ the first comparison controlled. Random Forest remains available explicitly:
 `--models logistic_regression random_forest`. Results and model/score artifacts
 are written under `results/baselines/robust_feature_first_fold_v1/`. The original
 baseline features, result JSON, and checkpoints are preserved.
+
+
+---
+
+## Next approved feature-cache design (5 Nov 2026)
+
+The current `relative_spectral_shape_v1` is an exploratory 170-feature first-fold experiment. It includes `log_std` and currently receives fold-standardized channel data. Do not silently redefine this version or reuse its cache after changing feature semantics.
+
+The next reusable representation should be a separate version:
+
+### Scale-free core
+
+- Relative delta/theta/alpha/beta/gamma power.
+- Normalized spectral entropy.
+- Skewness and excess kurtosis.
+- Line length divided by standard deviation.
+
+Test `log_std` as a separate amplitude-sensitive ablation, not as an assumed member of the scale-free core. Positive uniform scaling of a channel should not change the scale-free features (within numerical tolerance); add invariance tests.
+
+### Channel aggregation ablations
+
+Compare:
+1. Per-channel feature vector.
+2. Median and IQR across the 17 channels for each feature.
+3. Per-channel plus pooled median/IQR.
+4. Maximum pooling as a separate experiment, with attention to noisy-channel sensitivity.
+
+### Cache contract
+
+Extract deterministic features once from the existing processed windows without fitting a learned channel scaler. Store feature rows aligned with:
+- Canonical patient ID.
+- Recording relative path and subject/EDF identity.
+- Window start time and binary label.
+- Sampling frequency and channel/montage order.
+- Feature-set/version and preprocessing/window configuration.
+- Source artifact signature/checksum.
+
+Use partitioned Parquet or memory-mapped NumPy arrays plus a manifest. Avoid a single giant CSV and keep generated caches/results out of Git. Parallelize by recording only after a measured memory/CPU preflight and with a bounded worker count. A model-level scaler may still be used inside the estimator pipeline, fitted on each training fold only.
+
+### Evaluation design
+
+Use identical patient-grouped inner folds for every feature ablation and model comparison. Keep the legacy 221-feature baseline unchanged as the reference. Do not claim a new feature set wins based on one outer fold; compare across all outer patients after the pipeline is frozen.
