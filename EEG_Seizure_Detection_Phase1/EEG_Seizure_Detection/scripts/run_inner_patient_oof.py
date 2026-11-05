@@ -137,11 +137,36 @@ def build_feature_matrix(project_cache, std_root, stats_manifest, std_manifest, 
         if cursor != len(sy):
             raise RuntimeError(f"{split_name} recording offsets do not cover the cache")
 
-    total = sum(int(stats_by_path[r.relative_path]["count"]) for r in outer_train)
+    total = sum(int(std_by_path[r.relative_path]["window_count"]) for r in outer_train)
     if total != len(fit_y) + len(val_y):
         raise RuntimeError("OOF cache window count differs from robust feature caches")
     X = np.lib.format.open_memmap(x_path, mode="w+", dtype=np.float32, shape=(total, FEATURE_COUNT))
     y = np.lib.format.open_memmap(y_path, mode="w+", dtype=np.int8, shape=(total,))
+    # Aggregate recording sufficient statistics by patient once, then construct
+    # each held-out patient's scaler from the other 21 patients only.
+    patient_states = {}
+    for rec in outer_train:
+        entry = stats_by_path[rec.relative_path]
+        artifact = project_cache.parent / "oof_recording_stats_v1" / "recordings" / entry["artifact"]
+        with np.load(artifact, allow_pickle=False) as z:
+            if str(z["signature"].item()) != entry["signature"]:
+                raise RuntimeError(f"Stale channel-stat artifact: {rec.relative_path}")
+            state = {"count": int(z["count"]), "mean": z["mean"], "m2": z["m2"]}
+        if state["count"] <= 0 or state["mean"].shape != (len(PREFERRED_CHANNELS),) or state["m2"].shape != (len(PREFERRED_CHANNELS),):
+            raise RuntimeError(f"Invalid channel-stat state: {rec.relative_path}")
+        if rec.patient_id not in patient_states:
+            patient_states[rec.patient_id] = state
+        else:
+            patient_states[rec.patient_id] = merge_channel_statistics(patient_states[rec.patient_id], state)
+    fold_scales = {}
+    for heldout_patient in sorted(patient_states):
+        states = [value for patient, value in patient_states.items() if patient != heldout_patient]
+        merged = states[0]
+        for state in states[1:]:
+            merged = merge_channel_statistics(merged, state)
+        _, fold_scales[heldout_patient] = finalize_channel_statistics(merged)
+    del patient_states
+
     offsets, cursor = [], 0
     for index, rec in enumerate(outer_train, 1):
         if rec.relative_path not in row_lookup:
@@ -151,32 +176,15 @@ def build_feature_matrix(project_cache, std_root, stats_manifest, std_manifest, 
         stat_entry, std_entry = stats_by_path[rec.relative_path], std_by_path[rec.relative_path]
         if int(stat_entry["count"]) <= 0 or int(std_entry["window_count"]) != count:
             raise RuntimeError(f"Statistics/window count mismatch: {rec.relative_path}")
-        stat_path = std_root.parent / "oof_recording_stats_v1" / "recordings" / stat_entry["artifact"]
         std_path = std_root / "recordings" / std_entry["artifact"]
         try:
-            with np.load(stat_path, allow_pickle=False) as z:
-                state = {"count": int(z["count"]), "mean": z["mean"], "m2": z["m2"]}
             with np.load(std_path, allow_pickle=False) as z:
                 raw_std = z["std"]
                 if str(z["signature"].item()) != std_entry["signature"] or raw_std.shape != (count, len(PREFERRED_CHANNELS)):
                     raise RuntimeError(f"Invalid raw std artifact: {rec.relative_path}")
         except (OSError, EOFError, ValueError, KeyError, zipfile.BadZipFile) as exc:
             raise RuntimeError(f"Could not load OOF cache for {rec.relative_path}") from exc
-
-        # Merge every other patient. The held-out patient's channel statistics are excluded.
-        patient_states = []
-        for other in outer_train:
-            if other.patient_id == rec.patient_id:
-                continue
-            entry = stats_by_path[other.relative_path]
-            artifact = std_root.parent / "oof_recording_stats_v1" / "recordings" / entry["artifact"]
-            with np.load(artifact, allow_pickle=False) as z:
-                patient_states.append({"count": int(z["count"]), "mean": z["mean"], "m2": z["m2"]})
-        merged = patient_states[0]
-        for state in patient_states[1:]:
-            merged = merge_channel_statistics(merged, state)
-        _, fold_scale = finalize_channel_statistics(merged)
-        del patient_states, merged, state
+        fold_scale = fold_scales[rec.patient_id]
 
         for chunk_start in range(start, end, 4096):
             chunk_end = min(chunk_start + 4096, end)
