@@ -112,6 +112,40 @@ class EventMetricTests(unittest.TestCase):
         self.assertEqual(combined["false_alarm_count"], 1)
         self.assertAlmostEqual(combined["non_seizure_duration_seconds"], 18.0)
 
+    def test_event_metrics_work_without_exact_recording_duration(self):
+        result = evaluate_recording_events(
+            [0, 5, 10, 15], [0, 1, 1, 0], [(12, 16)],
+            window_seconds=5,
+        )
+        self.assertEqual(result["event_count"], 1)
+        self.assertEqual(result["detected_events"], 1)
+        self.assertEqual(result["event_sensitivity"], 1.0)
+        self.assertEqual(result["false_alarm_count"], 0)
+        self.assertIsNone(result["non_seizure_duration_seconds"])
+        self.assertIsNone(result["false_alarms_per_hour"])
+
+    def test_event_metrics_without_duration_still_count_false_alarms(self):
+        result = evaluate_recording_events(
+            [0, 10, 20, 30], [1, 0, 0, 0], [(20, 25)],
+            window_seconds=5,
+        )
+        self.assertEqual(result["false_alarm_count"], 1)
+        self.assertIsNone(result["false_alarms_per_hour"])
+
+    def test_aggregate_does_not_invent_exposure_when_any_duration_is_missing(self):
+        known = evaluate_recording_events(
+            [0, 5], [1, 0], [(1, 3)],
+            recording_duration_seconds=10, window_seconds=5,
+        )
+        unknown = evaluate_recording_events(
+            [0, 5], [0, 1], [],
+            window_seconds=5,
+        )
+        combined = aggregate_event_metrics([known, unknown])
+        self.assertEqual(combined["false_alarm_count"], 1)
+        self.assertIsNone(combined["non_seizure_duration_seconds"])
+        self.assertIsNone(combined["false_alarms_per_hour"])
+
 
 if __name__ == "__main__":
     unittest.main()
