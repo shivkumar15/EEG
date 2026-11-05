@@ -467,3 +467,6 @@ python -m scripts.run_inner_patient_oof --audit ..\\..\\docs\\full_annotation_au
 ```
 
 The OOF run is a substantial 22-model workload. Preserve all caches and score artifacts; do not delete `cache/oof_recording_stats_v1`, `cache/oof_window_std_v1`, `cache/robust_feature_first_fold_v1`, or `cache/oof_patient_scores_v1` while it is running. The pooled window-F2 threshold is provisional because probabilities from separate fold models may differ in calibration. Event-level threshold/false-alarm analysis and score-transfer review are still required before freezing a threshold. No outer-test patient_01 result is part of OOF.
+
+
+**Additional numerical safety gate:** before OOF fitting, the runner compares raw-std-reconstructed `log_std` values against every existing inner-validation feature row under the original scaler. It refuses to train if any value differs by more than `5e-4` or if any `log(1e-12)` floor classification differs. This check is pending local execution.
