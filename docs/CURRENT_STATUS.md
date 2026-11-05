@@ -68,16 +68,16 @@ Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached
 - Added deterministic synthetic tests in `tests/test_event_metrics.py`.
 - Added `docs/EVENT_LEVEL_EVALUATION.md` to freeze version-1 semantics.
 - Newly processed NPZ and metadata files store exact EDF recording duration. The existing 683-recording processed cohort predates that change. The user confirmed the extracted original EDF dataset was deleted after earlier guidance that it was no longer required. The attempted backfill dry-run consequently found all 683 EDF paths missing; it made no changes. Do not ask the user to download/reprocess the dataset again at this stage.
-- Added a read-only `scripts/audit_recording_durations.py` to inspect existing NPZ duration fields, aligned metadata CSVs and any central duration manifest. It does not read EDFs or modify data. Run this first to establish whether exact durations survived in any retained artifact.
-- If exact durations are absent, event sensitivity, missed/detected event counts and detection delay can still be evaluated from annotations and window timestamps. False alarms/hour must remain unavailable until exact recording exposure can be sourced; do not substitute the last complete window end as recording duration.
+- Added a read-only `scripts/audit_recording_durations.py` to inspect existing NPZ duration fields, aligned metadata CSVs and any central duration manifest. User ran it successfully: **683 recordings, 0 NPZ durations, 0 metadata durations, 0 manifest durations, 683 missing, 0 conflicts, 0 artifact errors**. It did not read EDFs or modify data.
+- Updated `evaluation/event_metrics.py` so exact duration is optional for event matching, event sensitivity, detection delay and false-alarm counts. When duration is unavailable, non-seizure exposure and false alarms/hour are explicitly `null`; pooled false alarms/hour is also null if any recording lacks exact exposure. New tests cover this behavior; local verification is pending.
 - **Local verification complete (5 November 2026):** focused event + saved-window tests 12/12 passed in 2.14 seconds; full suite 147 passed, 4 subtests passed, 4 skipped, 0 failures, in 3.43 seconds.
 
 ## Immediate next actions
 
-1. Pull the latest branch and run `python -m pytest tests/test_duration_audit.py -q`.
-2. Run the read-only duration audit against the retained 683-recording cohort; inspect available, missing and conflicting duration counts.
-3. Adapt the first-fold event evaluator to use only verified retained metadata. If duration is unavailable, report event sensitivity/delay and false-alarm counts, while leaving false alarms/hour null.
-4. Add patient-level event summaries and per-event error tables.
+1. Pull the latest branch and run `python -m pytest tests/test_event_metrics.py tests/test_duration_audit.py -q`.
+2. Integrate event metrics into the existing first-fold score artifacts, using the audit annotation manifest and exact window timestamps; preserve null false-alarms/hour because all 683 durations are currently unavailable.
+3. Add patient-level event summaries and per-event error tables.
+4. Verify the integrated evaluation on synthetic fixtures and existing first-fold score artifacts without retraining.
 5. Profile representative feature/scaler stages and validate recovery before authorizing any model training.
 
 ## Not yet completed
