@@ -225,7 +225,8 @@ def evaluate_recording_events(
         ),
         "false_alarms_per_hour": (
             float(false_alarm_count / (non_seizure_seconds / 3600.0))
-            if non_seizure_seconds > 0 else None
+            if non_seizure_seconds is not None and non_seizure_seconds > 0
+            else None
         ),
         "alarms": [asdict(alarm) for alarm in alarms],
     }
