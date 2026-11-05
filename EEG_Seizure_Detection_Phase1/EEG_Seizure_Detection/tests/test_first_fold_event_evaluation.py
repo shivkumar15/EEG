@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from data_management.patient_mapping import Recording
-from scripts.evaluate_first_fold_events import _score_slices, _patient_summaries
+from scripts.evaluate_first_fold_events import (\n    _score_slices, _patient_summaries, _add_event_score_diagnostics,\n)
 
 
 class FirstFoldEventEvaluationTests(unittest.TestCase):
@@ -70,6 +70,39 @@ class FirstFoldEventEvaluationTests(unittest.TestCase):
         self.assertEqual(summary["event_sensitivity"], 0.5)
         self.assertEqual(summary["false_alarm_count"], 4)
         self.assertIsNone(summary["false_alarms_per_hour"])
+
+    def test_event_score_diagnostics_explain_threshold_miss(self):
+        events = [{
+            "event_index": 1,
+            "seizure_start_seconds": 10.0,
+            "seizure_end_seconds": 15.0,
+            "detected": False,
+        }]
+        starts = np.asarray([0.0, 5.0, 10.0, 15.0, 20.0, 40.0])
+        scores = np.asarray([0.1, 0.2, 0.3, 0.4, 0.2, 0.1])
+        _add_event_score_diagnostics(
+            events, starts, scores, threshold=0.5, window_seconds=10.0
+        )
+        event = events[0]
+        self.assertEqual(event["overlapping_window_count"], 2)
+        self.assertAlmostEqual(event["max_overlapping_window_score"], 0.4)
+        self.assertAlmostEqual(event["max_score_minus_threshold"], -0.1)
+        self.assertEqual(event["top_scoring_window_start_seconds"], 15.0)
+        self.assertGreaterEqual(event["context_window_count"], 2)
+
+    def test_event_score_diagnostics_handles_no_overlapping_windows(self):
+        events = [{
+            "event_index": 1,
+            "seizure_start_seconds": 100.0,
+            "seizure_end_seconds": 105.0,
+            "detected": False,
+        }]
+        _add_event_score_diagnostics(
+            events, np.asarray([0.0, 5.0]), np.asarray([0.1, 0.2]),
+            threshold=0.5, window_seconds=10.0,
+        )
+        self.assertEqual(events[0]["overlapping_window_count"], 0)
+        self.assertIsNone(events[0]["max_overlapping_window_score"])
 
 
 if __name__ == "__main__":
