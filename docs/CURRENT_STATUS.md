@@ -1,4 +1,4 @@
-# Current Project Status — 4 November 2026
+# Current Project Status — 5 November 2026
 
 **Active repository:** https://github.com/shivkumar15/EEG  
 **Active branch:** `feature/threshold-strategy-score-artifacts`  
@@ -62,21 +62,29 @@ Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached
 
 **Verification state (5 November 2026):** the active branch `feature/threshold-strategy-score-artifacts` is 19 commits ahead of `feature/model-stage-checkpoints` and includes the model-stage checkpoint implementation. The user reports the complete repository test suite passing: 136 passed, 4 subtests passed, 4 skipped, in 3.95 seconds. The robust feature extraction tests also pass: 6/6 in 1.20 seconds. These are local software-test results; they do not validate model accuracy or prove an actual long-running process can resume from a real interruption. A controlled runner interruption/restart test remains pending. Do not start an expensive full-data experiment until runtime and recovery gates are reviewed.
 
+## Event-level evaluation foundation — implementation started
+
+- Added `evaluation/event_metrics.py` for positive-window alarm merging, annotation overlap matching, event sensitivity, detection delay, false-alarm count and false alarms per non-seizure hour.
+- Added deterministic synthetic tests in `tests/test_event_metrics.py`.
+- Added `docs/EVENT_LEVEL_EVALUATION.md` to freeze version-1 semantics.
+- Newly processed NPZ and metadata files now store exact EDF recording duration. Existing 683 NPZ artifacts predate this field; do not calculate false alarms/hour from their last complete window end.
+- **Local verification is pending:** the new event tests and duration-artifact test have been committed but have not yet been run by the user.
+
 ## Immediate next actions
 
-1. Verify the correct Python 3.11 environment (`.venv311`) from repository root.
-2. Run compile and focused `test_experiment_checkpoints.py` tests from the nested project code directory.
-3. Run the full unit test suite from that same directory.
-4. Review actual outputs and fix any failures before further work.
-5. Add/run controlled interruption and restart tests for the first-fold runner.
-6. Only after those checks, implement the complete 23-fold runner with per-fold result checkpoints and atomic aggregation.
+1. Pull the latest branch and run the new focused event/duration tests.
+2. Fix any failures and rerun the full regression suite.
+3. Implement a safe, restartable backfill of exact EDF durations for existing processed NPZ files (header-only read where supported); verify coverage before event scoring.
+4. Integrate event evaluation into the first-fold runner, retaining recording identity, timestamps and exact duration in each score artifact.
+5. Add patient-level event summaries and per-event error tables.
+6. Profile representative feature/scaler stages and validate recovery before authorizing any model training.
 
 ## Not yet completed
 
 - Complete 23-fold baseline runner and aggregated results.
 - Real-EEG baseline metrics across all outer patients.
 - 1D CNN, CNN-BiLSTM and CNN-BiLSTM-attention experiments.
-- Final window-level and event-level evaluation.
+- Event-level evaluation integration into the model runner and full 23-patient results.
 - Explainability.
 - FastAPI inference integration.
 - React dashboard integration with validated model output.
