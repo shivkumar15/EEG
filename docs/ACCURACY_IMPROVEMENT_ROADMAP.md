@@ -209,3 +209,96 @@ counts; false alarms/hour is not calculated. The outer-test patient is only
 evaluated after the validation threshold is frozen and is not used for
 selection. User execution and verification are pending. This is exploratory
 first-fold evidence only, not a replacement for nested LOPO evaluation.
+
+
+---
+
+## CTO roadmap update — reusable features and patient-wise operating evaluation (5 Nov 2026)
+
+This section supersedes earlier statements in this document that exact recording durations are unavailable. The primary cohort's durations have now been recovered from the committed inventory file; see the verified audit below.
+
+### A. Verified duration source and false-alarm-rate recovery
+
+A direct audit matched `docs/signal_inventory.csv` to the 683 recordings in the primary cohort derived from `docs/full_annotation_audit.csv`:
+
+- Inventory rows: 686; all 686 report successful header inspection.
+- Primary-cohort recordings matched: 683/683.
+- Missing, invalid, or internally inconsistent duration rows: 0.
+- Every matched duration agrees with `n_samples / sampling_frequency_hz` within 0.01 seconds.
+- Sum of primary-cohort recording durations: 979.9286 hours (raw recording exposure, before subtracting annotated seizure time).
+
+**Decision:** use `docs/signal_inventory.csv` as the exact-duration source for existing processed recordings. Join by normalized `relative_path` / `subject + edf_file`, never by row order or filename alone. Validate one-to-one matching and duration consistency before evaluation. For each recording, non-seizure exposure is recording duration minus the union of annotated seizure intervals, bounded to the recording interval. Then calculate false alarms/hour. If any recording lacks a valid exact duration or annotation alignment, fail closed for the affected aggregate rate; do not silently substitute window-end estimates.
+
+The previous NPZ duration audit remains true: the historical NPZ files contain no duration field. The inventory is a separate verified source and resolves this limitation without restoring or reprocessing EDF files.
+
+### B. Fast, reusable feature extraction
+
+**Approved direction:** create a deterministic, fold-independent feature cache from the existing processed EEG windows. Store features with canonical patient ID, recording path, window start, label, feature-set version, channel/montage version, sampling frequency and source signature. Prefer partitioned Parquet or memory-mapped NumPy arrays with a manifest over one giant CSV. Keep cache artifacts out of Git.
+
+- Extract deterministic features once; do not fit a learned scaler during feature extraction.
+- Parallelize by recording only after a timed memory/CPU preflight. Bound worker count and chunk size to avoid RAM pressure.
+- Keep feature extraction independent of labels; labels and timestamps are stored alongside features for later split selection.
+- Any model-level `StandardScaler` remains inside the estimator pipeline and is fitted on the training patients for that CV fold only.
+- Cache identity must include source checksums/signatures, feature definitions/version, channel order, window parameters and preprocessing version.
+
+### C. Feature ablations
+
+Run these as controlled, separately versioned experiments on the same patient folds:
+
+1. **Scale-free core:** relative delta/theta/alpha/beta/gamma power, normalized spectral entropy, skewness, excess kurtosis and line length divided by standard deviation.
+2. **Amplitude ablation:** add `log_std` to the scale-free core; do not assume amplitude is either useful or harmful.
+3. **Channel representation:** compare per-channel features, channel-pooled median + IQR, and their combination. Test channel maximum as a separate ablation because it can be driven by a noisy channel.
+4. Preserve the legacy 221-feature representation and its saved baseline as the reference. Do not replace it based on a first-fold result.
+
+The current 170-feature `relative_spectral_shape_v1` implementation includes `log_std` and is currently computed after fold-fitted channel standardization. It is an existing exploratory implementation, not yet the approved final scale-free cache design. Update or create a separate feature version rather than silently changing its semantics or reusing incompatible caches.
+
+### D. Patient-wise model selection
+
+Within each outer LOPO fold, use only its 22 outer-training patients for model selection. Generate inner out-of-fold scores using patient groups; no patient's recordings or overlapping windows may cross a group boundary. `StratifiedGroupKFold` may be used only after verifying that each fold has adequate seizure-bearing patient/event support. Stratifying millions of windows alone does not guarantee patient/event balance; add explicit fold diagnostics and deterministic fallback logic if needed.
+
+Approved, bounded comparisons:
+
+- Logistic Regression regularization `C` on a logarithmic grid (initial grid: 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1; optionally 10).
+- Compare class weighting, patient-balanced weighting, and their combination as separate configurations. Define patient weights using training data only and document normalization so one patient does not dominate by window count.
+- Compare one tree-based challenger only. Random Forest already exists in the codebase and is the first low-cost candidate; consider `HistGradientBoostingClassifier` only if there is a clear reason to replace or supplement it. Do not expand into a broad model zoo.
+- Do not use SMOTE or window-level oversampling as the default; retain natural temporal structure and evaluate weighting first.
+
+All hyperparameters, weighting, calibration, feature selection and alarm parameters are selected from inner-training/OOF data only. Store OOF scores with patient ID, recording ID, window start, label and experiment signature.
+
+**Score-transfer safeguard:** thresholds selected on inner OOF scores may not transfer unchanged to a final model refit on all 22 outer-training patients. Explicitly evaluate the calibration/score-scale transfer protocol using inner data only, then freeze it before outer-test scoring. Do not choose the protocol based on outer-test results.
+
+### E. Alarm policy and operating points
+
+Extend the existing event evaluator with validation-only comparisons of:
+- Existing consecutive-positive-window merging.
+- Rolling score means over 3–6 windows.
+- K-of-N rules.
+- Short-gap merging.
+
+Because windows are 10 seconds with a 5-second stride, report the added detection delay from smoothing and persistence rules. Freeze all post-processing parameters using inner OOF/validation predictions.
+
+Select/report sensitivity at predeclared false-alarm budgets such as 0.1, 0.5 and 1.0 false alarms per hour. These are research comparison points, not clinically established safety limits. Never optimize on outer-test labels. Report event sensitivity, false alarms/hour, delay and window metrics together.
+
+### F. Final nested evaluation and learning curves
+
+After the pipeline is frozen, run all 23 outer LOPO folds once with durable per-fold results and restart-safe scheduling. Each outer fold independently derives its feature/model/alarm choices from its own 22 training patients. Report one row per held-out patient, then patient-macro median, IQR and mean; also report pooled metrics as supplementary results.
+
+Learning curves at 4, 8, 12 and 17 training patients are optional, lower priority than completing the 23-fold evaluation. If run, keep held-out patients and all preprocessing/model-selection rules patient-independent.
+
+### G. Deferred ideas and application work
+
+Defer trailing-baseline normalization until the scale-free feature and alarm experiments are complete. If later tested, it must use only preceding signal history, have an explicit warm-up policy, use no labels, and be identical in training and inference. Defer external Siena validation until the CHB-MIT pipeline and report are stable.
+
+Prepare the API contract and dashboard against a clearly labelled saved baseline if useful for parallel development, but do not imply that it is the final validated model. Freeze preprocessing/model artifacts and inference parity before presenting real model outputs. The application must state that outputs are research estimates, not diagnosis.
+
+### H. Immediate execution order
+
+1. Integrate the verified inventory durations into event evaluation and add tests for path matching, duration consistency, seizure-exposure subtraction and FA/hour aggregation.
+2. Finish or safely pause the currently running first-fold robust-feature job; preserve all checkpoints and caches. Do not launch another multi-hour run until its actual result/runtime is reviewed.
+3. Build the reusable, deterministic scale-free feature cache with metadata and bounded parallel extraction.
+4. Add per-patient metrics, score/feature distribution diagnostics and a post-hoc patient_01 operating curve (diagnostic only).
+5. Run patient-grouped inner OOF model/weighting/feature comparisons.
+6. Compare alarm smoothing and K-of-N rules using inner OOF data.
+7. Freeze the pipeline, complete 23 outer folds, and then integrate the validated inference pipeline.
+
+Time-box engineering and classical experiments, but do not trade away leakage safeguards or required outer-fold coverage to meet a calendar target. A negative or inconclusive result is a valid research outcome.
