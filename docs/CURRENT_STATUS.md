@@ -115,3 +115,11 @@ Separate branch: `feature/react-dashboard-foundation`. Open PR #1: https://githu
 - [Scaler Checkpoints](SCALER_CHECKPOINTS.md)
 - [Model-Stage Checkpoints](MODEL_STAGE_CHECKPOINTS.md)
 - [Upstream Change Log](CHANGELOG_FOR_UPSTREAM.md)
+
+
+### Validation-only event threshold sweep added
+
+- Added `scripts/sweep_event_thresholds.py` and unit tests. It loads the existing checksum-validated first-fold score checkpoints and existing processed timestamps/labels; no model training or feature extraction is performed.
+- It evaluates 121 score-quantile candidates from 0.95 to 1.00 plus the existing validation F1/F2 thresholds. Selection uses only inner-validation seizure-bearing patient macro event F2 proxy. The proxy uses detected events divided by detected events plus false-alarm episodes as precision; it is explicitly not false alarms/hour.
+- After freezing the validation-selected threshold, the script evaluates the outer-test patient for descriptive comparison only. The outer-test labels do not participate in selection.
+- Output: `results/baselines/first_fold_event_threshold_sweep_v1.json`. User pull, tests and execution are pending.
