@@ -196,13 +196,22 @@ def run(audit_path: Path) -> dict:
         PATIENT, outer.train_recordings, row_lookup, base_signature,
         stats_entries, STD_ROOT, std_manifest, fold_mean, fold_scale, work_root,
     )
-    if not np.array_equal(np.asarray(y), np.asarray(saved_y[:len(y)])) and len(y) == len(saved_y):
-        raise RuntimeError("Fold feature labels do not match saved OOF labels")
-
     train_records = [rec for rec in offsets if rec["patient_id"] != PATIENT]
     test_records = [rec for rec in offsets if rec["patient_id"] == PATIENT]
     if len(train_records) != 582 or len(test_records) != 26:
         raise RuntimeError("Unexpected patient_14 fold recording split")
+    expected_offsets = []
+    heldout_cursor = 0
+    for rec in test_records:
+        count = int(rec["end"]) - int(rec["start"])
+        expected_offsets.append({
+            "relative_path": rec["relative_path"],
+            "start": heldout_cursor,
+            "end": heldout_cursor + count,
+        })
+        heldout_cursor += count
+    if expected_offsets != saved_offsets or heldout_cursor != len(saved_y):
+        raise RuntimeError("Saved OOF offsets do not match reconstructed fold matrix")
 
     scaler = StandardScaler()
     for rec in train_records:
@@ -309,6 +318,13 @@ def run(audit_path: Path) -> dict:
 
     print(f"Reconstruction max probability difference: {max_score_error:.8g}", flush=True)
     print(f"Saved {json_path.relative_to(ROOT)}", flush=True)
+    # Remove the temporary fold matrix after a successful diagnostic.
+    for filename in ("X.npy", "y.npy", "manifest.json", "progress.json"):
+        (work_folder / filename).unlink(missing_ok=True)
+    try:
+        work_folder.rmdir()
+    except OSError:
+        pass
     print("OOF score artifact unchanged; threshold not tuned; patient_01 not loaded.", flush=True)
     return result
 
