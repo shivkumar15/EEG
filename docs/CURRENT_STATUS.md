@@ -69,16 +69,17 @@ Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached
 - Added `docs/EVENT_LEVEL_EVALUATION.md` to freeze version-1 semantics.
 - Newly processed NPZ and metadata files store exact EDF recording duration. The existing 683-recording processed cohort predates that change. The user confirmed the extracted original EDF dataset was deleted after earlier guidance that it was no longer required. The attempted backfill dry-run consequently found all 683 EDF paths missing; it made no changes. Do not ask the user to download/reprocess the dataset again at this stage.
 - Added a read-only `scripts/audit_recording_durations.py` to inspect existing NPZ duration fields, aligned metadata CSVs and any central duration manifest. User ran it successfully: **683 recordings, 0 NPZ durations, 0 metadata durations, 0 manifest durations, 683 missing, 0 conflicts, 0 artifact errors**. It did not read EDFs or modify data.
-- Updated `evaluation/event_metrics.py` so exact duration is optional for event matching, event sensitivity, detection delay and false-alarm counts. When duration is unavailable, non-seizure exposure and false alarms/hour are explicitly `null`; pooled false alarms/hour is also null if any recording lacks exact exposure. New tests cover this behavior; local verification is pending.
+- Updated `evaluation/event_metrics.py` so exact duration is optional for event matching, event sensitivity, detection delay and false-alarm counts. When duration is unavailable, non-seizure exposure and false alarms/hour are explicitly `null`; pooled false alarms/hour is also null if any recording lacks exact exposure. User verified focused duration/event tests: **18 passed in 0.75 seconds**; full suite: **158 passed, 4 subtests passed, 0 failures in 3.73 seconds**.
+- Added `scripts/evaluate_first_fold_events.py` to evaluate the already-saved first-fold inner-validation and outer-test score artifacts without retraining. It reconstructs the deterministic patient split, verifies score artifact signatures/checksums, aligns score slices against per-recording NPZ labels, and writes per-recording/per-patient event metrics. It reports false-alarm counts but leaves false alarms/hour null due to missing durations. New integration-unit tests are added; user verification is pending.
 - **Local verification complete (5 November 2026):** focused event + saved-window tests 12/12 passed in 2.14 seconds; full suite 147 passed, 4 subtests passed, 4 skipped, 0 failures, in 3.43 seconds.
 
 ## Immediate next actions
 
-1. Pull the latest branch and run `python -m pytest tests/test_event_metrics.py tests/test_duration_audit.py -q`.
-2. Integrate event metrics into the existing first-fold score artifacts, using the audit annotation manifest and exact window timestamps; preserve null false-alarms/hour because all 683 durations are currently unavailable.
-3. Add patient-level event summaries and per-event error tables.
-4. Verify the integrated evaluation on synthetic fixtures and existing first-fold score artifacts without retraining.
-5. Profile representative feature/scaler stages and validate recovery before authorizing any model training.
+1. Pull the latest branch and run `python -m pytest tests/test_first_fold_event_evaluation.py -q`, then the full suite.
+2. Run `python -m scripts.evaluate_first_fold_events --audit ..\\..\\docs\\full_annotation_audit.csv` to evaluate the existing first-fold score artifacts without retraining.
+3. Inspect the generated per-recording and per-patient event results; verify event counts against the 185 audited seizure events represented in the full primary cohort, while recognizing fold 1 covers only its held-out patient.
+4. Add event error tables and evaluate all outer folds from existing score artifacts where available; do not launch model training just to obtain event metrics.
+5. Profile representative feature/scaler stages and validate recovery before authorizing any new model training.
 
 ## Not yet completed
 
