@@ -46,3 +46,23 @@ def test_accepts_exactly_two_seconds_for_spectral_features():
     result = extract_robust_features(np.ones((1, 1, 512)), 256)
     assert result.shape == (1, len(ROBUST_FEATURE_NAMES))
     assert np.isfinite(result).all()
+
+
+def test_chunked_extraction_matches_single_chunk():
+    rng = np.random.default_rng(19)
+    windows = rng.normal(size=(7, 3, 2560)).astype(np.float32)
+    single = extract_robust_features(windows, 256, chunk_size=7)
+    chunked = extract_robust_features(windows, 256, chunk_size=2)
+    np.testing.assert_allclose(chunked, single, rtol=1e-6, atol=1e-6)
+
+
+def test_rejects_non_positive_chunk_size():
+    with pytest.raises(ValueError, match="chunk_size"):
+        extract_robust_features(np.ones((1, 1, 512)), 256, chunk_size=0)
+
+
+def test_rejects_non_finite_values_in_later_chunk():
+    windows = np.ones((3, 1, 512), dtype=np.float32)
+    windows[2, 0, 10] = np.nan
+    with pytest.raises(ValueError, match="NaN or infinite"):
+        extract_robust_features(windows, 256, chunk_size=2)
