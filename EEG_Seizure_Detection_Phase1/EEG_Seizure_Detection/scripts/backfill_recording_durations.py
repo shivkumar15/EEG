@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 import tempfile
 from typing import Callable, Sequence
@@ -212,10 +213,15 @@ def backfill_recording_durations(
             counts["updated"] += 1
         except Exception as exc:
             counts["failed"] += 1
-            errors.append({
+            error = {
                 "relative_path": recording.relative_path,
                 "error": f"{type(exc).__name__}: {exc}",
-            })
+            }
+            errors.append(error)
+            print(
+                f"FAILED {recording.relative_path}: {error['error']}",
+                file=sys.stderr,
+            )
 
     if errors and not dry_run:
         _atomic_write_json(
