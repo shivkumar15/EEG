@@ -187,7 +187,7 @@ def _patient_summaries(recording_results: Sequence[dict]) -> list[dict]:
             "false_alarm_count": sum(item["false_alarm_count"] for item in items),
             "non_seizure_duration_seconds": (
                 sum(float(item["non_seizure_duration_seconds"]) for item in items)
-                if all(item["non_seizure_duration_seconds"] is not None for item in items)
+                if all(item.get("non_seizure_duration_seconds") is not None for item in items)
                 else None
             ),
             "false_alarms_per_hour": None,
