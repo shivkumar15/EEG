@@ -22,6 +22,15 @@ def test_merged_recording_statistics_match_concatenated_population_stats():
     np.testing.assert_allclose(scale, direct.std(axis=1), rtol=1e-12, atol=1e-12)
 
 
+
+def test_chunked_recording_statistics_match_one_batch():
+    rng = np.random.default_rng(44)
+    values = rng.normal(size=(9, 3, 128))
+    chunked = channel_sufficient_statistics(values, chunk_size=2)
+    direct = channel_sufficient_statistics(values, chunk_size=9)
+    np.testing.assert_allclose(chunked["mean"], direct["mean"], rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(chunked["m2"], direct["m2"], rtol=1e-12, atol=1e-10)
+
 def test_statistics_merge_is_order_independent_within_tolerance():
     rng = np.random.default_rng(3)
     batches = [rng.normal(size=(n, 2, 64)) for n in (2, 4, 3)]
