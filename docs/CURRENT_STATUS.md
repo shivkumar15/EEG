@@ -170,3 +170,42 @@ The historical NPZ duration audit remains correct (duration is absent from those
 Implement and test duration integration into `scripts/evaluate_first_fold_events.py` (or a reusable inventory loader) first. Then review the running robust-feature experiment's actual completion/result before launching any new expensive job. Preserve current checkpoints and caches. The reusable feature cache and patient-grouped OOF pipeline follow after these two gates.
 
 See [Accuracy Improvement Roadmap](ACCURACY_IMPROVEMENT_ROADMAP.md) for the full approved sequence and [Event-Level Evaluation](../EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/docs/EVENT_LEVEL_EVALUATION.md) for event metric semantics.
+
+
+---
+
+## Exact recording-duration integration — implementation committed (5 November 2026)
+
+The prior statement that exact durations were unavailable is superseded. The
+repository-root `docs/signal_inventory.csv` was re-audited against the
+annotation audit using normalized recording identity:
+
+- 686 inventory rows; 683 primary-cohort recordings.
+- 683/683 primary recordings matched; 0 missing and 0 identity mismatches.
+- 0 duplicate inventory paths and 0 duration arithmetic inconsistencies.
+- Every inventory duration agrees with `n_samples / sampling_frequency_hz`
+  within 0.01 seconds.
+- Three inventory rows are outside the primary cohort.
+- Raw primary-cohort exposure is 979.9286 hours; this is not the non-seizure
+  denominator for false alarms/hour.
+
+Committed implementation on `feature/threshold-strategy-score-artifacts`:
+
+- Added `evaluation/recording_inventory.py` for fail-closed, identity-based
+  duration joins.
+- Updated `scripts/evaluate_first_fold_events.py` to use the inventory,
+  clip annotations to recording bounds, and report per-recording, patient-pooled
+  and cohort-pooled non-seizure exposure and false alarms/hour.
+- Preserved the v1 event result; the new evaluator writes
+  `results/baselines/first_fold_patient_01_event_metrics_v2.json`.
+- Added tests for inventory identity, duplicate/missing paths, duration
+  arithmetic, per-recording FA/hour, patient-level pooled exposure, overlapping
+  seizure interval union and zero non-seizure exposure.
+- No model was trained, no feature cache/checkpoint was changed, and no
+  outer-test threshold or model selection was performed.
+
+**Verification pending:** the user must pull the latest branch, run the focused
+tests and execute the v2 saved-score evaluator locally. Do not claim these
+tests or the real saved-score evaluation have passed until their output is
+reviewed. The robust-feature result JSON remains a local, untracked artifact;
+the console summary alone is insufficient to audit its complete metrics.
