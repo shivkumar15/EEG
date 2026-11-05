@@ -1,12 +1,12 @@
-# Patient 14 OOF model-contribution audit
+# Patient-wise OOF model-contribution audit
 
 ## Purpose
 
-Patient 14 has weak threshold-independent discrimination (AUROC about 0.44 and
-AUPRC about 0.0026) despite selected individual robust features showing
-within-recording separation in some of its seven seizure-containing recordings.
-This diagnostic asks whether the fitted multivariate Logistic Regression model
-is combining those features in an unhelpful way.
+The initial diagnostic focused on patient_14 (AUROC about 0.44 and AUPRC about
+0.0026). The same audit can now be run for any inner-OOF patient other than
+patient_01. We will compare patients 13, 14 and 15 because they showed weak
+threshold-independent discrimination. The purpose is to determine whether
+feature-family and channel-level contribution patterns recur across patients.
 
 ## Method and safeguards
 
@@ -38,25 +38,27 @@ python -m pytest tests/test_patient14_model_contributions.py -q
 python -m scripts.audit_patient14_model_contributions --audit ..\..\docs\full_annotation_audit.csv
 ```
 
-The full diagnostic rebuilds the 608-recording feature matrix for the patient_14
-fold from existing caches and fits one Logistic Regression model. It may take
+The diagnostic rebuilds the 608-recording fold feature matrix for the selected patient from existing caches and fits the same Logistic Regression configuration. It may take
 some time and needs several hundred MB of temporary memory/disk. It does not
 require EDF downloads or reprocessing.
 
 ## Outputs
 
-- `results/diagnostics/patient_14_model_contribution_audit_v1.json`
+- `results/diagnostics/{patient_id}_model_contribution_audit_v1.json`
   - score reconstruction check;
   - average additive logit contribution by feature family, split by positive
     and negative windows;
   - largest absolute coefficients, with channel and feature names;
+  - channel-by-feature contribution summaries to expose channel-level cancellation;
   - interpretation limitations.
-- `results/diagnostics/patient_14_recording_contributions_v1.csv`
+- `results/diagnostics/{patient_id}_recording_contributions_v1.csv`
+  - per-recording positive/negative mean contribution for each feature family.
+- `results/diagnostics/{patient_id}_channel_feature_contributions_v1.csv`
+  - per-channel, per-feature contribution means and positive-minus-negative differences.
   - per-recording positive/negative mean contribution for each feature family.
 
 A negative contribution pushes the model logit downward relative to zero; it
-does not mean a feature is biologically protective. Only 48 positive windows
-exist across these recordings, and overlapping windows are correlated. Treat
+does not mean a feature is biologically protective. Positive-window counts vary by patient; overlapping windows are correlated. Treat
 per-recording summaries as descriptive, not independent-sample inference.
 
 ## Decision gate
