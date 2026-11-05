@@ -73,6 +73,49 @@ class FirstFoldEventEvaluationTests(unittest.TestCase):
         self.assertEqual(summary["false_alarm_count"], 4)
         self.assertIsNone(summary["false_alarms_per_hour"])
 
+    
+    def test_duration_inventory_is_used_for_false_alarms_per_hour(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            np.savez_compressed(
+                root / "chb01_chb01_03.npz",
+                y=np.asarray([0, 1, 0], dtype=np.int8),
+                starts=np.asarray([0.0, 5.0, 10.0]),
+            )
+            results = _score_slices(
+                [self.recording],
+                np.asarray([0, 1, 0], dtype=np.int8),
+                np.asarray([0.9, 0.1, 0.1]),
+                root,
+                0.5,
+                "test",
+                {self.recording.relative_path: 20.0},
+            )
+            row = results[0]
+            self.assertEqual(row["false_alarm_count"], 1)
+            self.assertEqual(row["non_seizure_duration_seconds"], 15.0)
+            self.assertAlmostEqual(row["false_alarms_per_hour"], 240.0)
+
+    def test_patient_rate_uses_summed_false_alarms_and_exposure(self):
+        rows = [
+            {
+                "patient_id": "patient_01", "event_count": 1,
+                "detected_events": 1, "missed_events": 0,
+                "mean_detection_delay_seconds": 2.0,
+                "false_alarm_count": 1, "non_seizure_duration_seconds": 900.0,
+            },
+            {
+                "patient_id": "patient_01", "event_count": 1,
+                "detected_events": 0, "missed_events": 1,
+                "mean_detection_delay_seconds": None,
+                "false_alarm_count": 1, "non_seizure_duration_seconds": 900.0,
+            },
+        ]
+        summary = _patient_summaries(rows)[0]
+        self.assertEqual(summary["false_alarm_count"], 2)
+        self.assertEqual(summary["non_seizure_duration_seconds"], 1800.0)
+        self.assertAlmostEqual(summary["false_alarms_per_hour"], 4.0)
+
     def test_event_score_diagnostics_explain_threshold_miss(self):
         events = [{
             "event_index": 1,
