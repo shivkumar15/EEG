@@ -510,3 +510,23 @@ The audit-only mode must report that no OOF models were trained. Do not change
 the tolerance or bypass this gate. Existing 608-recording raw-std cache and
 recording-statistics cache are retained; no cache rebuild is currently
 required. The outer-test patient `patient_01` remains excluded.
+
+
+
+### Windows checkpoint-lock resilience — committed (5 November 2026)
+
+During the long OOF run, Windows intermittently denied replacement of a fold's
+`progress.json` checkpoint. The resumable pipeline recovered on restart, but
+the repeated interruptions are avoidable operational friction.
+
+The OOF runner's `atomic_json` now writes to a unique same-directory temporary
+file, flushes it to disk, retries transient `PermissionError` failures with
+bounded backoff, and cleans up its temporary file on failure. It continues to
+use atomic replacement; it does not fall back to unsafe in-place JSON writes.
+
+Commit: `6d4aa7d`.
+
+The user had reached patient_09 feature construction (375/608) when the second
+lock occurred. The last valid checkpoint should be preserved. After pulling
+this fix, rerun the same OOF command; the runner should resume from the last
+valid patient_09 checkpoint and reuse completed patient score artifacts.
