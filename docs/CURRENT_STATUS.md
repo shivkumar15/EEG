@@ -321,3 +321,45 @@ detected only by legacy, events detected/missed by both, and per-recording
 false-alarm deltas. It is descriptive only: it does not tune thresholds,
 change alarm policies, retrain models, or use the outer-test result for
 selection. User pull and focused test/execution are pending.
+
+
+### Legacy-versus-robust first-fold event error comparison — locally verified (5 November 2026)
+
+The user pulled the comparison utility, ran
+`python -m pytest tests/test_event_result_comparison.py -q` (**3 passed**),
+and ran `python -m scripts.compare_first_fold_event_results`. The comparison
+completed using the saved event-evaluation JSON files, matched exact
+recording paths and seizure interval identities, and did not retrain or tune.
+
+**Inner validation (139 recordings, 29 events):**
+- Legacy detected 19; robust detected 27.
+- Robust recovered 9 events, regressed 1, both detected 18, both missed 1.
+- Legacy false alarms 1,327; robust 1,272 (55 fewer).
+
+**Held-out patient_01 (75 recordings, 11 events):**
+- Legacy detected 1; robust detected 4.
+- Robust recovered 3 events; regressed 0; both detected 1; both missed 7.
+- Legacy false alarms 40; robust 167 (+127).
+
+The three recovered held-out events were:
+- `chb01/chb01_16.edf`, 1015–1066 s; robust delay 30 s.
+- `chb01/chb01_18.edf`, 1720–1810 s; robust delay 10 s.
+- `chb01/chb01_21.edf`, 327–420 s; robust delay 53 s.
+
+Largest held-out per-recording false-alarm increases:
+- `chb01/chb01_34.edf`: 3 to 71 (+68).
+- `chb01/chb01_42.edf`: 8 to 20 (+12).
+- `chb01/chb01_33.edf`: 1 to 12 (+11).
+- `chb01/chb01_30.edf`: 0 to 4 (+4).
+
+The +68 in `chb01_34.edf` accounts for about 53.5% of the total +127
+false-alarm increase. This is descriptive concentration, not a proven
+signal-quality or physiological cause. Outer-test findings are post-hoc and
+must not be used to tune the model or alarm policy.
+
+**Decision / next step:** preserve the robust feature candidate. Inspect
+validation-only alarm temporal patterns and test a small, predeclared set of
+alarm persistence/merging policies using patient-grouped inner OOF predictions.
+Do not tune against patient_01 outer-test recordings or highlighted false
+positive recordings. First fold only; no model winner is declared until all
+23 outer folds are evaluated.
