@@ -35,7 +35,9 @@ From `EEG_Seizure_Detection` with the project's `.venv311` activated:
 ```powershell
 git pull origin feature/threshold-strategy-score-artifacts
 python -m pytest tests/test_patient14_model_contributions.py -q
-python -m scripts.audit_patient14_model_contributions --audit ..\..\docs\full_annotation_audit.csv
+python -m scripts.audit_patient14_model_contributions --patient patient_13 --audit ..\\..\\docs\\full_annotation_audit.csv
+python -m scripts.audit_patient14_model_contributions --patient patient_14 --audit ..\\..\\docs\\full_annotation_audit.csv
+python -m scripts.audit_patient14_model_contributions --patient patient_15 --audit ..\\..\\docs\\full_annotation_audit.csv
 ```
 
 The diagnostic rebuilds the 608-recording fold feature matrix for the selected patient from existing caches and fits the same Logistic Regression configuration. It may take
