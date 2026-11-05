@@ -106,3 +106,13 @@ def test_raw_std_cache_rejects_non_finite_and_invalid_scale():
         window_channel_standard_deviations(windows)
     with pytest.raises(ValueError, match="positive"):
         log_std_from_raw_standard_deviations(np.ones((2, 2)), np.array([1.0, 0.0]))
+
+
+def test_patient_grouped_scaler_omits_validation_patient():
+    from evaluation.oof_scaler_cache import patient_grouped_channel_scale
+    a = channel_sufficient_statistics(np.zeros((2, 1, 8)))
+    b = channel_sufficient_statistics(np.full((3, 1, 8), 10.0))
+    c = channel_sufficient_statistics(np.full((5, 1, 8), 1000.0))
+    mean, scale = patient_grouped_channel_scale({"a": a, "b": b, "c": c}, "c")
+    assert mean[0] == pytest.approx(6.0)
+    assert scale[0] == pytest.approx(np.sqrt(24.0))
