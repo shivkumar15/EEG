@@ -67,13 +67,13 @@ Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached
 - Added `evaluation/event_metrics.py` for positive-window alarm merging, annotation overlap matching, event sensitivity, detection delay, false-alarm count and false alarms per non-seizure hour.
 - Added deterministic synthetic tests in `tests/test_event_metrics.py`.
 - Added `docs/EVENT_LEVEL_EVALUATION.md` to freeze version-1 semantics.
-- Newly processed NPZ and metadata files now store exact EDF recording duration. Existing 683 NPZ artifacts predate this field; do not calculate false alarms/hour from their last complete window end.
+- Newly processed NPZ and metadata files now store exact EDF recording duration. Added `scripts/backfill_recording_durations.py` to read existing EDF headers without preloading signals and write duration into aligned metadata CSVs plus `processed/recording_durations.json`; existing NPZ archives are preserved byte-for-byte. Local verification of this utility is pending.
 - **Local verification complete (5 November 2026):** focused event + saved-window tests 12/12 passed in 2.14 seconds; full suite 147 passed, 4 subtests passed, 4 skipped, 0 failures, in 3.43 seconds.
 
 ## Immediate next actions
 
-1. Implement a safe, restartable exact-duration backfill for existing processed recordings using EDF header-only reads; preserve existing NPZ contents and record duration in aligned metadata/manifest artifacts.
-2. Add focused tests for interrupted/resumed backfill, existing-duration validation, metadata alignment and missing/corrupt EDF handling.
+1. Pull the latest branch and run `tests/test_duration_backfill.py`.
+2. Fix any failures and rerun the full regression suite.
 3. Integrate event evaluation into the first-fold runner, retaining recording identity, timestamps and exact duration in each score artifact.
 4. Add patient-level event summaries and per-event error tables.
 5. Profile representative feature/scaler stages and validate recovery before authorizing any model training.
