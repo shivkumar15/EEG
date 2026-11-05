@@ -15,6 +15,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 import sys
+import zipfile
 
 import numpy as np
 
@@ -84,7 +85,7 @@ def build(audit_path: Path, cache_root: Path) -> dict:
                         and np.isfinite(saved["m2"]).all()
                         and np.all(saved["m2"] >= 0)
                     )
-            except (OSError, ValueError, KeyError):
+            except (OSError, EOFError, ValueError, KeyError, zipfile.BadZipFile):
                 valid = False
         if not valid:
             item = load_recording_windows(PROCESSED_DIR, recording)
@@ -110,7 +111,18 @@ def build(audit_path: Path, cache_root: Path) -> dict:
             "artifact": artifact.name,
             "count": count,
         })
-        if index % 25 == 0 or index == len(fold.train_recordings):
+        # Durable per-recording checkpoint; valid artifacts are reused on restart.
+        _atomic_json(cache_root / "progress.json", {
+            "cache_version": CACHE_VERSION,
+            "outer_fold_id": fold.fold_id,
+            "excluded_outer_test_patient": fold.test_patient_id,
+            "completed_recordings": index,
+            "total_recordings": len(fold.train_recordings),
+            "last_recording": recording.relative_path,
+            "entries": entries,
+            "complete": False,
+        })
+        if index % 10 == 0 or index == len(fold.train_recordings):
             print(f"OOF statistics cache: {index}/{len(fold.train_recordings)} recordings", flush=True)
 
     manifest = {
@@ -126,6 +138,15 @@ def build(audit_path: Path, cache_root: Path) -> dict:
         "complete": len(entries) == len(fold.train_recordings),
     }
     _atomic_json(cache_root / "manifest.json", manifest)
+    _atomic_json(cache_root / "progress.json", {
+        "cache_version": CACHE_VERSION,
+        "outer_fold_id": fold.fold_id,
+        "excluded_outer_test_patient": fold.test_patient_id,
+        "completed_recordings": len(entries),
+        "total_recordings": len(fold.train_recordings),
+        "last_recording": entries[-1]["relative_path"] if entries else None,
+        "complete": True,
+    })
     if not manifest["complete"] or len(train_patients) != 22:
         raise RuntimeError("OOF statistics cache failed cohort integrity checks")
     print(f"Saved OOF recording statistics manifest: {cache_root / 'manifest.json'}", flush=True)
