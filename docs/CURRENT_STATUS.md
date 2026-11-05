@@ -530,3 +530,57 @@ The user had reached patient_09 feature construction (375/608) when the second
 lock occurred. The last valid checkpoint should be preserved. After pulling
 this fix, rerun the same OOF command; the runner should resume from the last
 valid patient_09 checkpoint and reuse completed patient score artifacts.
+
+
+---
+
+## CTO update — 22-fold OOF training completed; event evaluator committed (5 November 2026)
+
+### Verified by the user locally
+
+The complete patient-grouped inner OOF run finished successfully:
+- 22/22 held-out patient folds completed.
+- 652,077 OOF windows and 2,409 seizure-labelled windows.
+- 22 fold score files and `pooled_oof_scores.npz` exist and were successfully opened.
+- Each fold's score count and positive-window count were printed and the artifact verification assertion passed.
+- Provisional pooled window-F2 threshold: `0.98188316822052`.
+- The runner explicitly reported: `Outer-test patient_01 was not opened.`
+
+This confirms OOF artifact completion and basic file readability. It does not establish event-level detector performance or threshold generalization.
+
+### New implementation committed
+
+Added `scripts/evaluate_inner_oof_events.py` and
+`tests/test_inner_oof_event_evaluation.py`. The evaluator validates the 22
+fold score artifacts and recording offsets, aligns scores against processed
+labels/timestamps by recording identity, joins exact duration inventory,
+excludes `patient_01`, and computes event-level metrics at requested
+thresholds. It is read-only post-processing: no model fitting, feature
+extraction, or threshold selection.
+
+Default thresholds are the fixed 0.5 reference and the provisional pooled
+OOF window-F2 threshold. The latter was selected on these same OOF labels, so
+its event results are descriptive and optimistic for threshold selection.
+Cross-fold probability calibration is also not yet established.
+
+Default output:
+`results/baselines/inner_oof_event_metrics_v1.json`.
+
+### Next user verification
+
+From the nested Python project root:
+
+```powershell
+git pull origin feature/threshold-strategy-score-artifacts
+python -m pytest tests/test_inner_oof_event_evaluation.py -q
+python -m pytest -q
+python -m scripts.evaluate_inner_oof_events --audit ..\\..\\docs\\full_annotation_audit.csv
+```
+
+The evaluator must complete with 22 patients, 608 recordings, 652,077
+windows, and no patient_01 access. Review pooled and patient-level event
+sensitivity, detection delay, false-alarm episodes and false alarms per
+non-seizure hour before deciding on threshold calibration or alarm-policy
+experiments. Do not retrain OOF models or rebuild caches. Do not use the
+provisional threshold as a final operating threshold, and do not open the
+outer-test patient until all development choices are frozen.
