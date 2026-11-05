@@ -43,7 +43,7 @@ class InnerOofEventEvaluationTests(unittest.TestCase):
         ]
         with self.assertRaisesRegex(ValueError, "Non-contiguous"):
             validate_recording_offsets(gap, records, 8)
-        with self.assertRaisesRegex(ValueError, "cover 8 scores"):
+        with self.assertRaisesRegex(ValueError, "cover 3 scores"):
             validate_recording_offsets(gap[:1], records[:1], 9)
 
     def test_patient_summary_pools_exposure_before_calculating_rate(self):
