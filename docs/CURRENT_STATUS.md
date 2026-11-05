@@ -289,3 +289,23 @@ where false alarms increased. Then test the approved alarm smoothing /
 K-of-N and short-gap merging policies using patient-grouped inner OOF data
 only. Keep the outer-test result sealed from further tuning. The complete
 23-fold nested patient-level evaluation remains required.
+
+
+### Research operating targets — CTO decision (5 November 2026)
+
+For development planning, the project adopts an aspirational event-sensitivity
+target of **at least 90%** at a primary research operating point of **no more
+than 1.0 false alarm per non-seizure hour**. Also report event sensitivity at
+0.1 and 0.5 false alarms/hour, mean/median detection delay, and per-patient
+results. These are engineering/research objectives, not clinical acceptance
+criteria or guarantees of safety. Report both pooled event sensitivity and
+patient-macro summaries across all 23 outer LOPO folds; do not let a large
+number of events from one patient conceal poor performance on others.
+
+Current patient_01 robust first-fold result is 4/11 events (36.36%) at
+2.281 false alarms/hour. This is a first-fold result only and is below the
+research target. The next task is descriptive legacy-vs-robust per-event and
+per-recording error analysis. Outer-test diagnostics are post-hoc only and
+must not be used to tune thresholds or alarm policies. Alarm-policy selection
+must use patient-grouped inner validation/OOF predictions, with a frozen
+protocol before any outer-test evaluation.
