@@ -11,13 +11,13 @@ feature-family and channel-level contribution patterns recur across patients.
 ## Method and safeguards
 
 `scripts/audit_patient14_model_contributions.py` deterministically reconstructs
-the existing patient_14 inner-OOF fold using the same 21-patient training set,
+the selected patient's existing inner-OOF fold using the same 21-patient training set,
 patient-excluded channel scaler, fold feature matrix, incremental
 `StandardScaler.partial_fit` sequence, and balanced liblinear Logistic
 Regression configuration.
 
 **The audit will not interpret coefficients unless reconstructed probabilities
-match the saved patient_14 OOF artifact within an absolute tolerance of 2e-6.**
+match that patient's saved OOF artifact within an absolute tolerance of 2e-6.**
 It validates recording order, labels, and score count before writing results.
 
 - Outer-test patient_01 is excluded before processed recording access.
@@ -55,7 +55,6 @@ require EDF downloads or reprocessing.
   - per-recording positive/negative mean contribution for each feature family.
 - `results/diagnostics/{patient_id}_channel_feature_contributions_v1.csv`
   - per-channel, per-feature contribution means and positive-minus-negative differences.
-  - per-recording positive/negative mean contribution for each feature family.
 
 A negative contribution pushes the model logit downward relative to zero; it
 does not mean a feature is biologically protective. Positive-window counts vary by patient; overlapping windows are correlated. Treat
@@ -68,6 +67,7 @@ per-recording summaries as descriptive, not independent-sample inference.
 2. If reconstruction passes, inspect whether feature families consistently
    push positive windows toward lower logits, and whether that differs by
    recording.
-3. Do not reverse features, remove channels, or retrain based on this one
-   patient. Any model change must be justified across the full patient-grouped
-   OOF cohort and evaluated under the sealed outer-test protocol later.
+3. Do not reverse features, remove channels, or change the model based on one
+   patient. Compare patients 13, 14 and 15 first. Any candidate change must be
+   justified across the full patient-grouped OOF cohort and evaluated later
+   under the sealed outer-test protocol.
