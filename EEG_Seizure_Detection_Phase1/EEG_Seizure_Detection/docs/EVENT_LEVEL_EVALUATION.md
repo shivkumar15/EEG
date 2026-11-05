@@ -113,3 +113,38 @@ score in a 30-second context on each side. These values distinguish a
 near-threshold miss from an event for which the model assigned uniformly low
 scores. Context scores are descriptive only and are not used to change the
 threshold or evaluate/tune the model.
+
+## Validation-only event-threshold sweep
+
+`scripts/sweep_event_thresholds.py` evaluates candidate thresholds against
+the existing checksum-validated first-fold inner-validation score artifact.
+It loads processed labels/timestamps once, verifies the saved score labels
+against each recording, and does not train a model or regenerate features.
+
+The candidate set consists of 121 score quantiles from 0.95 through 1.00,
+plus the existing validation F1 and F2 thresholds. The selection objective is
+macro-average patient event F2 across seizure-bearing inner-validation
+patients. Its precision term is an explicitly exploratory proxy:
+
+`detected seizure events / (detected seizure events + false-alarm episodes)`.
+
+This proxy penalizes false-alarm episodes but is not false alarms/hour. Exact
+recording exposure is unavailable, so no rate constraint or clinical alarm
+claim can be made. Ties are resolved by higher macro event sensitivity, then
+fewer false-alarm episodes, then the higher threshold.
+
+After the validation threshold is frozen, the script evaluates the outer-test
+patient once at the selected threshold and at the two existing thresholds for
+descriptive comparison only. Outer-test outcomes are never used for selection.
+The full validation candidate table and the frozen outer-test comparison are
+written to `results/baselines/first_fold_event_threshold_sweep_v1.json`.
+
+Run from the `EEG_Seizure_Detection` directory:
+
+```powershell
+python -m scripts.sweep_event_thresholds --audit ..\\..\\docs\\full_annotation_audit.csv
+```
+
+This is an exploratory first-fold threshold experiment, not a full nested
+23-fold result. The selected threshold must not be treated as a general
+deployment threshold until repeated nested patient-wise validation is complete.
