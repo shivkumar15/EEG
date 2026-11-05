@@ -227,3 +227,18 @@ The existing model pipeline is a usable **research baseline**, not a high-perfor
 - The 170-feature robust representation is not an established winner over the legacy 221-feature reference.
 
 No additional accuracy experiment is required before building the complete software system. Preserve all existing outputs and methods. Accuracy improvement is deferred to a future research milestone and must remain documented, reproducible and patient-wise.
+
+
+## 10. Software and artifact integrity verification
+
+These are user-reported local verification outputs recorded in the project work history. They are software checks, not evidence of clinical or model generalization performance.
+
+- Full repository suite after OOF event evaluator changes: **213 passed, 4 subtests passed, in 3.87 seconds**.
+- Fold-aware feature stability focused tests: **4 passed in 2.50 seconds**.
+- Raw-standard-deviation reconstruction audit: 3,672,085 values checked; maximum absolute error 2.3841858e-07; zero values over tolerance; zero floor mismatches.
+- Patient 13/14/15 contribution audit reconstruction: maximum probability difference 0 for each audited patient.
+- Patient 14 feature diagnostic affine-invariance check: maximum absolute difference 7.6293945e-06; no values exceeded the stated 1e-4 tolerance.
+- OOF artifact integrity: 22 fold files, 22 patient folds, 652,077 windows, 2,409 positive windows; patient_01 excluded.
+- Fold-aware audit completed: 22 folds, 7,480 patient-feature-class rows; report flags confirm no model training, no threshold tuning, no OOF score modification and no patient_01 access.
+
+Do not infer that these tests establish a reusable deployable model. The next artifact-readiness audit must separately verify model serialization, scaler(s), feature ordering and end-to-end inference parity.
