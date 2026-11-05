@@ -162,3 +162,23 @@ def log_std_from_raw_standard_deviations(
     if not np.isfinite(result).all():
         raise RuntimeError("fold log_std contains non-finite values")
     return result
+
+
+def patient_grouped_channel_scale(
+    patient_statistics: dict[str, dict[str, object]],
+    heldout_patient: str,
+    epsilon: float = 1e-6,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Fit channel mean/scale using every patient except the held-out patient."""
+    if heldout_patient not in patient_statistics:
+        raise ValueError("held-out patient is missing from the statistics mapping")
+    training_states = [
+        state for patient, state in patient_statistics.items()
+        if patient != heldout_patient
+    ]
+    if len(training_states) < 1:
+        raise ValueError("at least one non-held-out training patient is required")
+    merged = training_states[0]
+    for state in training_states[1:]:
+        merged = merge_channel_statistics(merged, state)
+    return finalize_channel_statistics(merged, epsilon=epsilon)
