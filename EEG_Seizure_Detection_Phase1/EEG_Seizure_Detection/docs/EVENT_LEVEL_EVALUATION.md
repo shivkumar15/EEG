@@ -148,3 +148,30 @@ python -m scripts.sweep_event_thresholds --audit ..\\..\\docs\\full_annotation_a
 This is an exploratory first-fold threshold experiment, not a full nested
 23-fold result. The selected threshold must not be treated as a general
 deployment threshold until repeated nested patient-wise validation is complete.
+
+
+---
+
+## Exact-duration source correction — primary cohort inventory
+
+The historical processed NPZ files were audited and contain no `recording_duration_seconds` field. However, a separate committed inventory file is available at repository path `docs/signal_inventory.csv` (repository root). A direct identity-based audit against `docs/full_annotation_audit.csv` verified:
+
+- 683/683 primary-cohort recordings matched to an inventory row.
+- No missing, invalid or internally inconsistent duration values.
+- Each duration agrees with `n_samples / sampling_frequency_hz` within 0.01 seconds.
+- Total raw primary-cohort duration is 979.9286 hours.
+
+Therefore, the earlier statement that FA/hour is unavailable for the existing cohort is superseded. The evaluator should load the inventory as an explicit duration source and join on canonical recording identity (prefer normalized `relative_path`; validate `subject` and `edf_file` too). Never align by CSV row order.
+
+For each recording:
+1. Validate finite positive `duration_seconds`, positive `n_samples` and `sampling_frequency_hz`.
+2. Verify `duration_seconds ≈ n_samples / sampling_frequency_hz` within a documented tolerance.
+3. Parse seizure annotations, clip to the recording interval and calculate the union duration of annotated seizure intervals (avoid double-subtracting overlapping annotations).
+4. Calculate non-seizure exposure = recording duration − union seizure duration.
+5. Calculate false alarms/hour = false-alarm episode count / (non-seizure exposure / 3600).
+
+Fail closed on missing/duplicate/mismatched inventory identities or invalid exposure. Keep the existing policy of never inferring duration from the final complete window. Add deterministic tests for successful joins, duplicate/missing paths, inconsistent duration arithmetic, overlapping seizure intervals, zero exposure and patient-level aggregation.
+
+The 979.9286-hour figure is raw recording exposure, not non-seizure exposure and not a false-alarm-rate denominator. Patient-macro FA/hour should be computed from each patient's summed false alarms divided by that patient's summed non-seizure exposure; also report per-recording values and pooled exposure-weighted FA/hour. Do not average recording FA/hour values as though recordings were equal duration.
+
+The saved-score first-fold evaluator can be extended to use this inventory without retraining. Recompute the first-fold event metrics as a post-processing step and retain the old result artifact for provenance; write a versioned result that records the duration source and matching audit. This first-fold update does not replace full 23-fold evaluation.
