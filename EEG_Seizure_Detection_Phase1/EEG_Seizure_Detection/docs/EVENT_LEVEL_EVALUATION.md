@@ -175,3 +175,34 @@ Fail closed on missing/duplicate/mismatched inventory identities or invalid expo
 The 979.9286-hour figure is raw recording exposure, not non-seizure exposure and not a false-alarm-rate denominator. Patient-macro FA/hour should be computed from each patient's summed false alarms divided by that patient's summed non-seizure exposure; also report per-recording values and pooled exposure-weighted FA/hour. Do not average recording FA/hour values as though recordings were equal duration.
 
 The saved-score first-fold evaluator can be extended to use this inventory without retraining. Recompute the first-fold event metrics as a post-processing step and retain the old result artifact for provenance; write a versioned result that records the duration source and matching audit. This first-fold update does not replace full 23-fold evaluation.
+
+
+## Exact-duration integration implementation — version 2
+
+The first-fold saved-score evaluator now reads repository-root
+`docs/signal_inventory.csv` by default (or accepts `--inventory`). It
+validates inventory identity and duration arithmetic, then joins primary-cohort
+recordings by normalized `relative_path`, cross-checking `subject` and
+`edf_file`. It never uses row order. Inventory rows outside the primary
+cohort are counted as unmatched extras and excluded from evaluation.
+
+Seizure annotations are clipped to true recording bounds before subtracting
+their union from recording duration. Per-recording, patient-pooled and
+cohort-pooled non-seizure exposure and false alarms/hour are reported. Patient
+rates use summed false alarms divided by summed non-seizure exposure, not an
+average of recording rates. Zero non-seizure exposure yields a null rate.
+
+The updated evaluator writes
+`results/baselines/first_fold_patient_01_event_metrics_v2.json`; v1 is
+retained unchanged for provenance. This is saved-score post-processing only:
+no model fit, feature extraction, threshold selection, or outer-test tuning.
+
+Run from the `EEG_Seizure_Detection` directory:
+
+```powershell
+python -m scripts.evaluate_first_fold_events --audit ..\\..\\docs\\full_annotation_audit.csv
+```
+
+Override the inventory path with `--inventory PATH` if needed. New tests cover
+normalized identity joins, duplicate and missing rows, inconsistent duration
+arithmetic, and identity mismatches.
