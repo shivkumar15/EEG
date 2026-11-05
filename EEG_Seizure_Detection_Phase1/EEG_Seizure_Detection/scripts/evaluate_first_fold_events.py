@@ -22,10 +22,12 @@ from data_management.fold_data import processed_path_for_recording
 from data_management.patient_mapping import Recording, load_recording_manifest
 from data_management.validation_split import build_patient_validation_split
 from evaluation.event_metrics import (
+    TimeInterval,
     aggregate_event_metrics,
     evaluate_recording_events,
     parse_seizure_intervals,
 )
+from evaluation.recording_inventory import load_recording_durations
 from modeling.experiment_checkpoints import ModelStageCheckpointStore
 from scripts.run_first_baseline_fold import (
     _build_checkpoint_context,
@@ -79,6 +81,7 @@ def _score_slices(
     processed_dir: Path,
     threshold: float,
     split_name: str,
+    duration_by_path: dict[str, float] | None = None,
 ) -> list[dict]:
     expected_total = 0
     lengths: list[int] = []
@@ -121,11 +124,18 @@ def _score_slices(
             )
         predictions = (scores >= threshold).astype(np.int8)
         seizures = parse_seizure_intervals(recording.seizure_intervals_seconds)
+        duration = duration_by_path[recording.relative_path] if duration_by_path is not None else None
+        if duration is not None:
+            seizures = tuple(
+                TimeInterval(max(0.0, item.start), min(duration, item.end))
+                for item in seizures
+                if min(duration, item.end) > max(0.0, item.start)
+            )
         metrics = evaluate_recording_events(
             starts,
             predictions,
             seizures,
-            recording_duration_seconds=None,
+            recording_duration_seconds=duration,
             window_seconds=WINDOW_SECONDS,
         )
         _add_event_score_diagnostics(
@@ -175,9 +185,18 @@ def _patient_summaries(recording_results: Sequence[dict]) -> list[dict]:
                 if delay_total else None
             ),
             "false_alarm_count": sum(item["false_alarm_count"] for item in items),
-            "non_seizure_duration_seconds": None,
+            "non_seizure_duration_seconds": (
+                sum(float(item["non_seizure_duration_seconds"]) for item in items)
+                if all(item["non_seizure_duration_seconds"] is not None for item in items)
+                else None
+            ),
             "false_alarms_per_hour": None,
         })
+        exposure = summaries[-1]["non_seizure_duration_seconds"]
+        if exposure is not None and exposure > 0:
+            summaries[-1]["false_alarms_per_hour"] = (
+                summaries[-1]["false_alarm_count"] / (exposure / 3600.0)
+            )
     return summaries
 
 
@@ -188,9 +207,10 @@ def _evaluate_threshold(
     processed_dir: Path,
     threshold: float,
     split_name: str,
+    duration_by_path: dict[str, float] | None = None,
 ) -> dict:
     by_recording = _score_slices(
-        recordings, y_true, scores, processed_dir, threshold, split_name
+        recordings, y_true, scores, processed_dir, threshold, split_name, duration_by_path
     )
     return {
         "threshold": float(threshold),
@@ -206,6 +226,7 @@ def evaluate_first_fold_events(
     output_path: Path,
     processed_dir: Path = PROCESSED_DIR,
     checkpoint_dir: Path | None = None,
+    inventory_path: Path | None = None,
 ) -> dict:
     recordings = filter_primary_cohort(load_recording_manifest(audit_path))
     folds = build_lopo_folds(recordings)
@@ -243,20 +264,26 @@ def evaluate_first_fold_events(
     }
     validation_y, validation_values = validation_scores
     test_y, test_values = outer_scores
+    if inventory_path is None:
+        repository_root = Path(__file__).resolve().parents[3]
+        inventory_path = repository_root / "docs" / "signal_inventory.csv"
+    duration_by_path, duration_audit = load_recording_durations(inventory_path, recordings)
 
     results = {
         "experiment": "first_fold_event_evaluation",
-        "version": "saved_score_event_metrics_v1",
+        "version": "saved_score_event_metrics_v2_exact_inventory_duration",
         "status": "completed",
         "source_baseline_result": str(result_path),
         "fold_id": fold.fold_id,
         "held_out_patient": fold.test_patient_id,
         "model_retrained": False,
         "score_artifacts_checksum_validated": True,
-        "recording_duration_availability": "unavailable_for_all_683_primary_recordings",
+        "recording_duration_availability": "exact_inventory_duration_for_all_primary_recordings",
+        "duration_source_audit": duration_audit,
         "duration_policy": (
-            "False alarms/hour and non-seizure exposure are null; no duration "
-            "is inferred from the final window."
+            "Exact duration is joined by normalized relative_path and cross-checked "
+            "against subject and EDF filename. Non-seizure exposure subtracts the "
+            "union of seizure annotations clipped to recording bounds."
         ),
         "alarm_policy": {
             "window_seconds": WINDOW_SECONDS,
@@ -268,26 +295,25 @@ def evaluate_first_fold_events(
         "validation": {
             "f1_threshold": _evaluate_threshold(
                 inner_split.validation_recordings, validation_y, validation_values,
-                processed_dir, thresholds["validation_f1"], "inner_validation",
+                processed_dir, thresholds["validation_f1"], "inner_validation", duration_by_path,
             ),
             "f2_threshold": _evaluate_threshold(
                 inner_split.validation_recordings, validation_y, validation_values,
-                processed_dir, thresholds["validation_f2"], "inner_validation",
+                processed_dir, thresholds["validation_f2"], "inner_validation", duration_by_path,
             ),
         },
         "outer_test": {
             "f1_threshold": _evaluate_threshold(
                 fold.test_recordings, test_y, test_values,
-                processed_dir, thresholds["validation_f1"], "outer_test",
+                processed_dir, thresholds["validation_f1"], "outer_test", duration_by_path,
             ),
             "f2_threshold": _evaluate_threshold(
                 fold.test_recordings, test_y, test_values,
-                processed_dir, thresholds["validation_f2"], "outer_test",
+                processed_dir, thresholds["validation_f2"], "outer_test", duration_by_path,
             ),
         },
         "limitations": [
             "Only the first LOPO fold is evaluated; this is not a 23-patient result.",
-            "Recording durations are absent from all retained primary-cohort artifacts, so false alarms/hour cannot be calculated.",
             "Thresholds were selected on inner validation and were not tuned using outer-test labels.",
         ],
     }
@@ -308,15 +334,17 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("results/baselines/first_fold_patient_01_event_metrics_v1.json"),
+        default=Path("results/baselines/first_fold_patient_01_event_metrics_v2.json"),
     )
     parser.add_argument("--processed-dir", type=Path, default=PROCESSED_DIR)
     parser.add_argument("--checkpoint-dir", type=Path, default=None)
+    parser.add_argument("--inventory", type=Path, default=None)
     args = parser.parse_args()
     result = evaluate_first_fold_events(
         args.audit, args.result, args.output,
         processed_dir=args.processed_dir,
         checkpoint_dir=args.checkpoint_dir,
+        inventory_path=args.inventory,
     )
     print(json.dumps({
         "status": result["status"],
