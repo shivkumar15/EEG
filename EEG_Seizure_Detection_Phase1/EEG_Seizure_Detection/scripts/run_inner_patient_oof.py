@@ -24,7 +24,7 @@ from data_management.patient_mapping import load_recording_manifest
 from data_management.validation_split import build_patient_validation_split
 from evaluation.oof_scaler_cache import (
     finalize_channel_statistics, log_std_from_raw_standard_deviations,
-    merge_channel_statistics,
+    merge_channel_statistics, patient_grouped_channel_scale,
 )
 from modeling.baseline import calculate_metrics
 
@@ -136,13 +136,9 @@ def aggregate_patient_statistics(stats_root, manifest, outer_train):
 
 def fold_channel_scale(heldout_patient, patient_states):
     # This fold's held-out patient's entire recordings are excluded from scaler fit.
-    states = [state for patient, state in patient_states.items() if patient != heldout_patient]
-    if len(states) != 21:
-        raise RuntimeError("OOF channel scaler must use exactly 21 training patients")
-    merged = states[0]
-    for state in states[1:]:
-        merged = merge_channel_statistics(merged, state)
-    _, scale = finalize_channel_statistics(merged)
+    if len(patient_states) != 22:
+        raise RuntimeError("OOF channel scaler requires exactly 22 patients")
+    _, scale = patient_grouped_channel_scale(patient_states, heldout_patient)
     return scale
 
 
