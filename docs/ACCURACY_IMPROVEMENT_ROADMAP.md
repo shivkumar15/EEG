@@ -196,3 +196,16 @@ A result is retained only if:
 - Runtime and memory are acceptable and reproducible.
 
 If a candidate does not meet these conditions, record it as rejected or inconclusive and move to the next planned hypothesis. Do not keep changing the plan in response to one disappointing fold.
+
+## Validation-only event threshold sweep (implementation added)
+
+A saved-score-only threshold sweep is implemented in
+`scripts/sweep_event_thresholds.py`. It uses 121 score quantiles between
+0.95 and 1.00 plus the existing validation F1/F2 thresholds. Selection is
+based exclusively on macro patient event F2 on seizure-bearing inner-validation
+patients. Because exact recording durations are unavailable, precision uses
+an explicitly labelled event-F2 proxy that penalizes false-alarm episode
+counts; false alarms/hour is not calculated. The outer-test patient is only
+evaluated after the validation threshold is frozen and is not used for
+selection. User execution and verification are pending. This is exploratory
+first-fold evidence only, not a replacement for nested LOPO evaluation.
