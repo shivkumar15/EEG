@@ -35,3 +35,8 @@ def test_constant_signal_has_finite_shape_features():
 def test_rejects_invalid_sampling_rate():
     with pytest.raises(ValueError):
         extract_robust_features(np.ones((1, 1, 256)), 40)
+
+
+def test_rejects_too_short_window_for_spectral_features():
+    with pytest.raises(ValueError):
+        extract_robust_features(np.ones((1, 1, 128)), 256)
