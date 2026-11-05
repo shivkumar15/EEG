@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
-from config import PROCESSED_DIR, RANDOM_STATE
+from config import PROCESSED_DIR, RANDOM_STATE, WINDOW_SECONDS
 from data_management.cohort import filter_primary_cohort
 from data_management.dataset_split import build_lopo_folds
 from data_management.patient_mapping import load_recording_manifest
@@ -107,7 +107,7 @@ def evaluate_robust_first_fold_events(
         "recording_duration_availability": "exact_inventory_duration_for_all_primary_recordings",
         "duration_source_audit": duration_audit,
         "alarm_policy": {
-            "window_seconds": 10,
+            "window_seconds": WINDOW_SECONDS,
             "merge_gap_seconds": 0.0,
             "positive_window_rule": "score >= robust inner-validation-selected threshold",
             "event_match": "any half-open interval overlap",
