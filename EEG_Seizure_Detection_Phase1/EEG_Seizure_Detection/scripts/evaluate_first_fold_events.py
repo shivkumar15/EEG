@@ -33,6 +33,45 @@ from scripts.run_first_baseline_fold import (
 )
 
 
+def _add_event_score_diagnostics(
+    events: list[dict],
+    starts: np.ndarray,
+    scores: np.ndarray,
+    threshold: float,
+    window_seconds: float,
+    context_seconds: float = 30.0,
+) -> None:
+    """Attach score summaries for windows overlapping each event and its context."""
+    for event in events:
+        event_start = float(event["seizure_start_seconds"])
+        event_end = float(event["seizure_end_seconds"])
+        overlap = (starts < event_end) & (starts + window_seconds > event_start)
+        context = (
+            (starts < event_end + context_seconds)
+            & (starts + window_seconds > event_start - context_seconds)
+        )
+        event_scores = scores[overlap]
+        context_scores = scores[context]
+        if event_scores.size:
+            top_index = int(np.argmax(event_scores))
+            event["overlapping_window_count"] = int(event_scores.size)
+            event["max_overlapping_window_score"] = float(event_scores[top_index])
+            event["median_overlapping_window_score"] = float(np.median(event_scores))
+            event["top_scoring_window_start_seconds"] = float(starts[overlap][top_index])
+            event["max_score_minus_threshold"] = float(event_scores[top_index] - threshold)
+        else:
+            event["overlapping_window_count"] = 0
+            event["max_overlapping_window_score"] = None
+            event["median_overlapping_window_score"] = None
+            event["top_scoring_window_start_seconds"] = None
+            event["max_score_minus_threshold"] = None
+        event["context_seconds_each_side"] = float(context_seconds)
+        event["context_window_count"] = int(context_scores.size)
+        event["max_context_window_score"] = (
+            float(np.max(context_scores)) if context_scores.size else None
+        )
+
+
 def _score_slices(
     recordings: Sequence[Recording],
     y_scores: np.ndarray,
@@ -88,6 +127,9 @@ def _score_slices(
             seizures,
             recording_duration_seconds=None,
             window_seconds=WINDOW_SECONDS,
+        )
+        _add_event_score_diagnostics(
+            metrics["events"], starts, scores, threshold, WINDOW_SECONDS
         )
         output.append({
             "relative_path": recording.relative_path,
