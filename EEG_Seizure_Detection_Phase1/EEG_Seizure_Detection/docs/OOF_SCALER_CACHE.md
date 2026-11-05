@@ -100,3 +100,9 @@ Only then launch the 22-fold training runner:
 ```powershell
 python -m scripts.run_inner_patient_oof --audit ..\\..\\docs\\full_annotation_audit.csv
 ```
+
+Before OOF fitting, the runner compares reconstructed `log_std` against the
+existing real inner-validation feature cache under the original scaler. It checks
+all validation windows, requires maximum absolute error at most `5e-4`, and
+requires zero mismatches at the `log(1e-12)` floor. If this real-data audit
+fails, the runner stops before fitting any OOF model; do not bypass the check.
