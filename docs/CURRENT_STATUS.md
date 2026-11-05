@@ -363,3 +363,19 @@ alarm persistence/merging policies using patient-grouped inner OOF predictions.
 Do not tune against patient_01 outer-test recordings or highlighted false
 positive recordings. First fold only; no model winner is declared until all
 23 outer folds are evaluated.
+
+
+### Alarm-policy simulation v1 superseded by evidence-preserving v2 (5 November 2026)
+
+The first validation-only 24-combination interval simulation was executed locally and its six focused tests passed. A subsequent methodological review found that v1 merged alarm envelopes before duration filtering and event matching. This could (a) let silent gaps contribute to minimum alarm duration and (b) count a seizure as detected when the seizure fell only inside a merged gap, despite no actual positive alarm interval overlapping the seizure. Therefore v1 results are exploratory/debugging output only; no policy was selected or adopted from them.
+
+The simulation was corrected in v2:
+- Minimum duration is applied independently to each actual model-positive alarm interval before grouping.
+- Seizure event detection and delay use only retained actual positive intervals; gap grouping cannot create event detections.
+- Gap grouping affects alarm episode counts only. A grouped episode is considered non-false only if at least one actual retained alarm interval in that group overlaps an annotated seizure.
+- The 24-combination grid and exact saved non-seizure exposure are retained; outer-test data is not read.
+- Updated tests explicitly cover seizure-in-gap false detection prevention and duration filtering before grouping.
+
+Commits: script 54797174750abd2f21a934700bff439580ed5f4a; tests d60ba559b086ffd771fd1dd209f7613bd42eb392.
+
+Verification pending: user must pull, run python -m pytest tests/test_alarm_policy_simulation.py -q, and execute python -m scripts.simulate_validation_alarm_policies. The corrected output is results/baselines/robust_validation_alarm_policy_simulation_v2.json. Do not cite v1 policy metrics as validated findings.
