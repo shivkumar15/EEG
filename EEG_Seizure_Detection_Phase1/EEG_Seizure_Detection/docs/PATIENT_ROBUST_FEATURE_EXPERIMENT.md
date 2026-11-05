@@ -37,6 +37,16 @@ From the EEG project root:
 python -m pytest tests/test_robust_feature_extraction.py -q
 ```
 
-The first-fold experiment runner is added separately after the feature extractor
-passes its unit tests. Do not replace or delete legacy feature definitions or
-baseline results.
+Run the first-fold experiment from the project root:
+
+```powershell
+python -m pytest tests/test_robust_feature_extraction.py -q
+python -u .\\scripts\\run_robust_feature_first_fold.py
+```
+
+The runner caches completed feature extraction per recording and resumes from
+its manifest after interruption. It evaluates Logistic Regression and Random
+Forest by default. To run only Logistic Regression, append
+`--models logistic_regression`. Results and model/score artifacts are written
+under `results/baselines/robust_feature_first_fold_v1/`. The original baseline
+features, result JSON, and checkpoints are preserved.
