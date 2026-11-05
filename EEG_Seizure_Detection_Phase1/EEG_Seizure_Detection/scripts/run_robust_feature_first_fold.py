@@ -173,7 +173,7 @@ def collect_robust_batch(recordings, split_name: str, scaler, cache_root: Path) 
         })
         if (index + 1) % 25 == 0 or index + 1 == len(recordings):
             print(f"  {split_name}: {index + 1}/{len(recordings)} recordings", flush=True)
-        del item, standardized, features
+        del item
 
     if cursor != total_windows or not np.isin(y, (0, 1)).all():
         raise RuntimeError(f"{split_name} feature/label arrays failed integrity checks")
