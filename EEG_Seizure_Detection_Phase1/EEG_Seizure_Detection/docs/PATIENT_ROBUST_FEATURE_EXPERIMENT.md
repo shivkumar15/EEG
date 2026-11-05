@@ -45,8 +45,11 @@ python -u .\\scripts\\run_robust_feature_first_fold.py
 ```
 
 The runner caches completed feature extraction per recording and resumes from
-its manifest after interruption. It evaluates Logistic Regression and Random
-Forest by default. To run only Logistic Regression, append
-`--models logistic_regression`. Results and model/score artifacts are written
-under `results/baselines/robust_feature_first_fold_v1/`. The original baseline
-features, result JSON, and checkpoints are preserved.
+its manifest after interruption. Feature extraction is processed in 256-window
+chunks so temporary float64 and Welch PSD arrays remain bounded; a recording is
+marked complete only after all its chunks have been written. The default run
+uses Logistic Regression only, matching the legacy baseline model and keeping
+the first comparison controlled. Random Forest remains available explicitly:
+`--models logistic_regression random_forest`. Results and model/score artifacts
+are written under `results/baselines/robust_feature_first_fold_v1/`. The original
+baseline features, result JSON, and checkpoints are preserved.
