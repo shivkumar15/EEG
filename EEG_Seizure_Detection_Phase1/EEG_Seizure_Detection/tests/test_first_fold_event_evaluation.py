@@ -6,7 +6,9 @@ from pathlib import Path
 import numpy as np
 
 from data_management.patient_mapping import Recording
-from scripts.evaluate_first_fold_events import (\n    _score_slices, _patient_summaries, _add_event_score_diagnostics,\n)
+from scripts.evaluate_first_fold_events import (
+    _score_slices, _patient_summaries, _add_event_score_diagnostics,
+)
 
 
 class FirstFoldEventEvaluationTests(unittest.TestCase):
