@@ -168,7 +168,7 @@ The pilot is an engineering/runtime check, not a performance claim. Every long j
 |---|---|---|
 | 0 | Freeze this roadmap and reconcile phase numbering/branch status in project docs | This document establishes the proposed roadmap |
 | 1 | Stop or leave paused the unverified robust-feature run; do not start it again yet | Required before further experiments |
-| 2 | Install pytest and run focused feature tests | pytest is installed locally; test result not yet reported |
+| 2 | Install pytest and run focused feature tests | **Complete (5 Nov 2026):** focused robust-feature tests 6/6 passed in 1.20 s; full repository suite 136 passed, 4 subtests passed, 4 skipped, 0 failures/errors in 3.95 s |
 | 3 | Inspect/optimize scaler and feature-cache runtime using a timed pilot | Next engineering task; no full-cohort run |
 | 4 | Implement and test event-level metrics and alarm rules | Required before accuracy claims |
 | 5 | Finalize the threshold/refit protocol comparison | Controlled pilot only |
