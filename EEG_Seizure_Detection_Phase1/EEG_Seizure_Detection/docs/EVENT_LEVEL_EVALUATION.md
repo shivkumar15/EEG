@@ -93,3 +93,13 @@ python -m scripts.evaluate_first_fold_events --audit ..\\..\\docs\\full_annotati
 
 This is a post-processing/evaluation step over saved scores; it does not
 retrain Logistic Regression or regenerate EEG features.
+
+
+## Per-event error analysis
+
+Each recording result also stores an `events` list with one row per annotated
+seizure: chronological event index, annotation start/end, detected flag, first
+overlapping alarm start, detection delay, and number of matching alarms.
+Missed events have null first-alarm and delay fields. This allows the team to
+identify exactly which seizure annotations were missed or detected late,
+rather than relying only on one aggregate sensitivity value.
