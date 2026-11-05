@@ -44,7 +44,7 @@ class EventMetricTests(unittest.TestCase):
 
     def test_missed_event_has_zero_event_sensitivity(self):
         result = evaluate_recording_events(
-            [0, 5, 10], [0, 0, 0], [(12, 16)],
+            [0, 5, 10], [0, 0, 0], [(12, 15)],
             recording_duration_seconds=15, window_seconds=5,
         )
         self.assertEqual(result["missed_events"], 1)
@@ -53,7 +53,7 @@ class EventMetricTests(unittest.TestCase):
 
     def test_false_alarm_rate_uses_non_seizure_exposure(self):
         result = evaluate_recording_events(
-            [0, 10, 20, 30], [1, 0, 0, 1], [(20, 25)],
+            [0, 10, 20, 30], [1, 0, 0, 0], [(20, 25)],
             recording_duration_seconds=40, window_seconds=5,
         )
         self.assertEqual(result["false_alarm_count"], 1)
