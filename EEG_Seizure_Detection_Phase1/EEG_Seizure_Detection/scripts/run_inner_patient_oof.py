@@ -5,7 +5,7 @@ channel-statistics cache, and the compact raw per-window std cache. The outer
 test patient is excluded before processed recordings are accessed.
 """
 from __future__ import annotations
-import argparse, hashlib, json, os, sys, zipfile
+import argparse, hashlib, json, os, sys, tempfile, time, zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,10 +35,39 @@ VERSION = "patient_grouped_oof_robust_v3"
 
 
 def atomic_json(path, value):
+    """Write a JSON checkpoint safely, tolerating transient Windows file locks."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(path.suffix + ".tmp")
-    temp.write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8")
-    os.replace(temp, path)
+    payload = json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    temp_name = None
+    try:
+        # A unique same-directory temporary file avoids collisions with stale
+        # .tmp files and keeps os.replace on the same filesystem.
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n",
+            dir=path.parent, prefix=f".{path.name}.", suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_name = handle.name
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        delays = (0.25, 0.5, 1.0, 2.0, 3.0, 3.0)
+        for attempt, delay in enumerate(delays, start=1):
+            try:
+                os.replace(temp_name, path)
+                temp_name = None
+                return
+            except PermissionError:
+                if attempt == len(delays):
+                    raise
+                time.sleep(delay)
+    finally:
+        if temp_name is not None:
+            try:
+                os.unlink(temp_name)
+            except FileNotFoundError:
+                pass
 
 
 def digest(value):
