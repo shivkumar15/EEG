@@ -72,8 +72,8 @@ Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached
 
 ## Immediate next actions
 
-1. Pull the latest branch and run `tests/test_duration_backfill.py`.
-2. Fix any failures and rerun the full regression suite.
+1. Run the backfill utility in `--dry-run` mode against the real 683-recording cohort; inspect updated/skipped/failed counts and error file if any.
+2. If dry-run is clean, run the actual backfill and verify 683/683 duration entries plus metadata alignment.
 3. Integrate event evaluation into the first-fold runner, retaining recording identity, timestamps and exact duration in each score artifact.
 4. Add patient-level event summaries and per-event error tables.
 5. Profile representative feature/scaler stages and validate recovery before authorizing any model training.
