@@ -146,6 +146,24 @@ class EventMetricTests(unittest.TestCase):
         self.assertIsNone(combined["non_seizure_duration_seconds"])
         self.assertIsNone(combined["false_alarms_per_hour"])
 
+    
+    def test_overlapping_seizure_annotations_are_subtracted_as_union(self):
+        result = evaluate_recording_events(
+            [0, 10, 20, 30], [0, 0, 0, 0],
+            [(10, 20), (15, 25)], recording_duration_seconds=40,
+            window_seconds=5,
+        )
+        self.assertAlmostEqual(result["non_seizure_duration_seconds"], 25.0)
+        self.assertEqual(result["false_alarm_count"], 0)
+
+    def test_zero_non_seizure_exposure_has_undefined_false_alarm_rate(self):
+        result = evaluate_recording_events(
+            [0, 5, 10], [0, 0, 0], [(0, 15)],
+            recording_duration_seconds=15, window_seconds=5,
+        )
+        self.assertEqual(result["non_seizure_duration_seconds"], 0.0)
+        self.assertIsNone(result["false_alarms_per_hour"])
+
     def test_returns_per_event_detection_details_and_delay(self):
         result = evaluate_recording_events(
             [0, 5, 10, 15, 20], [0, 1, 0, 0, 0],
