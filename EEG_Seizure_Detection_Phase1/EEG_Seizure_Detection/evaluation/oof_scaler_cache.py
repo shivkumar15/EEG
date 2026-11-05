@@ -113,3 +113,52 @@ def recompute_log_std_features(
     if not np.isfinite(result).all():
         raise RuntimeError("recomputed log_std contains non-finite values")
     return result
+
+
+
+def window_channel_standard_deviations(
+    windows: np.ndarray, chunk_size: int = 256
+) -> np.ndarray:
+    """Cache raw per-window/per-channel population std for fast fold log_std.
+
+    Standardization is a per-channel affine transform. Apart from float32
+    rounding, std( (window - fold_mean) / fold_scale ) equals raw_std/fold_scale.
+    This compact cache avoids rereading/decompressing all EEG windows for each
+    OOF fold. Output is float32 with shape (n_windows, n_channels).
+    """
+    values = np.asarray(windows)
+    if values.ndim != 3 or any(size == 0 for size in values.shape):
+        raise ValueError("windows must have non-empty (windows, channels, samples) shape")
+    if not isinstance(chunk_size, (int, np.integer)) or isinstance(chunk_size, bool) or chunk_size <= 0:
+        raise ValueError("chunk_size must be a positive integer")
+    result = np.empty((len(values), values.shape[1]), dtype=np.float32)
+    for start in range(0, len(values), int(chunk_size)):
+        stop = min(start + int(chunk_size), len(values))
+        chunk = np.asarray(values[start:stop], dtype=np.float64)
+        if not np.isfinite(chunk).all():
+            raise ValueError("windows contain non-finite values")
+        centered = chunk - np.mean(chunk, axis=-1, keepdims=True)
+        result[start:stop] = np.std(centered, axis=-1).astype(np.float32)
+    if not np.isfinite(result).all() or np.any(result < 0):
+        raise RuntimeError("invalid per-window channel standard deviations")
+    return result
+
+
+def log_std_from_raw_standard_deviations(
+    raw_std: np.ndarray, scale: np.ndarray
+) -> np.ndarray:
+    """Apply fold channel scales to cached raw std, returning robust log_std."""
+    values = np.asarray(raw_std, dtype=np.float32)
+    channel_scale = np.asarray(scale, dtype=np.float64)
+    if values.ndim != 2 or values.shape[1] != len(channel_scale):
+        raise ValueError("raw_std must be (windows, channels) and match scale")
+    if not np.isfinite(values).all() or np.any(values < 0):
+        raise ValueError("raw_std must be finite and non-negative")
+    if not np.isfinite(channel_scale).all() or np.any(channel_scale <= 0):
+        raise ValueError("scale must be finite and positive")
+    result = np.log(np.maximum(
+        values.astype(np.float64) / channel_scale[None, :], 1e-12
+    )).astype(np.float32)
+    if not np.isfinite(result).all():
+        raise RuntimeError("fold log_std contains non-finite values")
+    return result
