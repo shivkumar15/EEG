@@ -113,7 +113,8 @@ def run(audit: Path, output: Path = DEFAULT_OUTPUT):
     if set(oof_metrics) != set(patients):
         raise RuntimeError("OOF report patient identities differ from cache cohort")
 
-    work_root = OOF_ROOT / "feature_work"
+    # Isolate audit scratch files; never touch the original OOF feature_work cache.
+    work_root = CACHE / "fold_aware_feature_stability_work_v1"
     work_root.mkdir(parents=True, exist_ok=True)
     rows = []
     fold_summaries = []
