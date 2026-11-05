@@ -36,7 +36,6 @@ From the EEG Python project root:
 python -m pytest tests/test_oof_scaler_cache.py -q
 python -m scripts.build_oof_recording_stats_cache --audit ..\\..\\docs\\full_annotation_audit.csv
 python -m scripts.build_oof_window_std_cache --audit ..\\..\\docs\\full_annotation_audit.csv
-python -m scripts.run_inner_patient_oof --audit ..\\..\\docs\\full_annotation_audit.csv
 ```
 
 The builder reads existing processed NPZ windows; it does not require original
@@ -90,3 +89,14 @@ The first recording-statistics cache has been built locally by the user for all
 608 outer-training recordings. The focused statistics tests passed (8/8).
 The raw window-std cache and 22-fold OOF runner still require local execution
 and verification. Do not interpret committed code as a completed experiment.
+
+After the second builder finishes, verify its manifest before training:
+- `complete` is `true`.
+- `recording_count` is `608`.
+- `excluded_outer_test_patient` is `patient_01`.
+
+Only then launch the 22-fold training runner:
+
+```powershell
+python -m scripts.run_inner_patient_oof --audit ..\\..\\docs\\full_annotation_audit.csv
+```
