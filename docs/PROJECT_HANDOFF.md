@@ -84,16 +84,22 @@ Key facts:
 
 **Baseline decision:** the 170-feature robust Logistic Regression is the provisional application candidate because it is the more recent developed pipeline, but it is not a proven winner. The 221-feature legacy model remains the reference comparator. Do not mark the model frozen until the next artifact audit confirms a complete, reusable inference artifact and exact preprocessing configuration.
 
-**Current immediate task:** create a model artifact/inference readiness inventory using local files only:
-- confirm robust model/checkpoint file exists and can be deserialized;
-- identify model scaler and feature scaler separately, if both exist;
+**Local verification update (6 November 2026):** the robust model was deserialized, the fold scaler checkpoint was restored/finalized, the validation cache was verified, and cached-feature-to-model parity passed for 216,005 validation rows (maximum absolute probability difference about 2.33e-15). This is local verification only; raw processed-EEG-to-model inference parity remains pending and the baseline is not formally frozen.
+
+**Current immediate task:** complete raw processed-recording inference parity and confirm the approved artifact transfer using local files only:
+- obtain and hash-verify the approved local artifact bundle (see `docs/ARTIFACT_TRANSFER_GUIDE.md`);
 - confirm exact 170-feature order, channel order, input sampling rate, filters, window size/stride, normalization and threshold provenance;
-- confirm how a single incoming recording is transformed into the exact feature matrix;
-- run a small inference smoke test using an existing processed recording/cache, without retraining and without opening patient_01 for development decisions;
-- record checksums, software versions and artifact paths.
+- run the complete processed-NPZ → scaler → robust feature extractor → model path on an approved non-sealed development recording;
+- compare generated feature rows and probabilities with the matching reference cache/scores using explicit tolerances;
+- record the input recording identity, artifact hashes, software versions, exact commands and outputs;
+- do not retrain, and do not use patient_01 for tuning, calibration, feature selection or development decisions.
 If a required deployable model artifact does not exist, determine whether an already completed model checkpoint can be exported safely. Do not retrain automatically.
 
 **Only after that audit:** freeze a versioned model package and start the FastAPI backend.
+
+## Teammate onboarding and artifact transfer
+
+New contributors must start with [`TEAMMATE_ONBOARDING.md`](TEAMMATE_ONBOARDING.md), then read [`ARTIFACT_TRANSFER_GUIDE.md`](ARTIFACT_TRANSFER_GUIDE.md). A fresh clone does not guarantee access to processed NPZs, runtime caches or all local artifacts. Transfer is not considered complete until the receiver verifies the SHA-256 manifest and records the accepted files.
 
 ## 6. Planned system architecture
 
