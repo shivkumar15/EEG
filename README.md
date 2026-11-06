@@ -9,9 +9,9 @@ Academic EEG seizure-detection project using the CHB-MIT Scalp EEG Database. The
 - Active working repository: https://github.com/shivkumar15/EEG
 - Original source repository: https://github.com/student-anshu/EEG-seizure-detection
 
-## Start here — project handoff
+## Start here — teammate onboarding and project handoff
 
-A new developer or ChatGPT session should read these files in order:
+New teammates should begin with [Teammate Onboarding](docs/TEAMMATE_ONBOARDING.md) and [Artifact Transfer Guide](docs/ARTIFACT_TRANSFER_GUIDE.md). A new developer or ChatGPT session should then read these files in order:
 
 1. [Complete Project Handoff](docs/PROJECT_HANDOFF.md) — authoritative context, exact stopping point and next actions.
 2. [Current Project Status](docs/CURRENT_STATUS.md) — current milestone and verified state.
@@ -22,7 +22,9 @@ A new developer or ChatGPT session should read these files in order:
 
 ## Current direction
 
-Model accuracy optimization is paused. The priority is to complete a reproducible end-to-end application while preserving all actual model results and limitations. The 170-feature robust Logistic Regression is a provisional integration candidate, not a proven winner; the legacy 221-feature model remains a reference. The next task is to verify the saved model/checkpoint, scaler(s), feature order and preprocessing/inference contract before freezing a versioned baseline and implementing FastAPI.
+Local verification update (6 November 2026): the robust model loads, the fold scaler checkpoint restores, and cached-feature-to-model parity was reported passing locally for 216,005 validation rows (maximum absolute probability difference approximately 2.33e-15). Raw processed EEG-to-model inference parity remains pending; these local checks are not a formal baseline freeze.
+
+Model accuracy optimization is paused. The priority is to complete a reproducible end-to-end application while preserving all actual model results and limitations. The 170-feature robust Logistic Regression is a provisional integration candidate, not a proven winner; the legacy 221-feature model remains a reference. The next task is to complete raw processed-recording inference parity and document the artifact transfer before freezing a versioned baseline and implementing FastAPI.
 
 Do not retrain automatically, do not use sealed outer-test patient_01 for tuning, and do not ask for EDF redownload/reprocessing as a routine step. See the handoff documents for details.
 
