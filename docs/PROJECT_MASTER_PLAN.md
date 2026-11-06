@@ -3,7 +3,7 @@
 **Working repository:** https://github.com/shivkumar15/EEG  
 **Original source repository:** https://github.com/student-anshu/EEG-seizure-detection  
 **Current branch:** `feature/cross-patient-feature-stability-audit`  
-**Current milestone:** model artifact/inference-readiness audit, then FastAPI backend.
+**Current milestone:** complete raw processed-EEG inference parity; then freeze the baseline and implement FastAPI.
 
 ## 1. Research and product objective
 
@@ -65,6 +65,8 @@ The exact feature definitions, runner paths, artifact paths, thresholds, tables 
 
 ## 5. Current model freeze policy
 
+Local verification update (6 November 2026): the robust model deserialized, the fold-specific scaler checkpoint restored/finalized, and cached-feature-to-model parity passed locally for 216,005 validation rows (maximum absolute probability difference approximately 2.33e-15). These checks do not verify raw processed-EEG preprocessing-to-score parity and have not yet been independently reproduced by a teammate. The formal baseline remains unfrozen. See [Teammate Onboarding](TEAMMATE_ONBOARDING.md) and [Artifact Transfer Guide](ARTIFACT_TRANSFER_GUIDE.md) for setup and local artifact requirements.
+
 Accuracy experiments are paused. The 170-feature robust LR is the provisional model candidate for application integration; the legacy 221-feature LR remains the reference. Do not claim the robust model is better overall.
 
 Before calling the model frozen, verify the actual serialized model, all required scaler(s), feature/channel order, preprocessing configuration, inference function, threshold provenance and reproducible smoke test. If the saved model artifact is incomplete, inspect existing completed checkpoints and export safely without retraining. Document the final artifact inventory in `docs/MODEL_BASELINE_FREEZE.md`.
@@ -108,14 +110,14 @@ Feature extraction -> LR model
 
 ## 7. Execution roadmap
 
-### Gate 1 — model artifact/inference readiness (next)
-- Inspect local results/checkpoints/caches.
-- Verify model serialization and scaler(s).
-- Verify exact feature/channel ordering and preprocessing.
-- Verify threshold and alarm policy source.
-- Run smoke test using permitted development data/saved features.
-- Create `MODEL_BASELINE_FREEZE.md`.
-- Freeze only after reproducibility is demonstrated.
+### Gate 1 — raw processed-EEG inference parity (next)
+- Obtain and hash-verify the approved local artifact bundle; do not assume caches or processed NPZs are in a fresh clone.
+- Verify exact feature/channel ordering and preprocessing contract from source.
+- Use an approved non-sealed development recording to run processed NPZ → scaler → robust feature extraction → model.
+- Compare generated features and probabilities with matching reference cache/scores using explicit tolerances.
+- Record artifact hashes, software versions, input identity, commands and outputs.
+- Do not tune, calibrate or select features using patient_01.
+- Create `MODEL_BASELINE_FREEZE.md` only after end-to-end inference parity passes.
 
 ### Gate 2 — FastAPI backend
 - Define supported input format and API contract.
