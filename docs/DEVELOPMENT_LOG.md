@@ -163,3 +163,32 @@ Current milestone: **4.1 — feature extraction and scientific validation**.
   - Master plan: `6777ab130d5957e2a797edfd3d1fe89e86a0dcd6`
   - README: `f2e745fd4b5051146ecfb374e583cab5a92c9a80`
 - This documentation update did not run local tests, train a model, modify model scores or change dataset artifacts.
+
+
+---
+
+## 2026-11-06 — Teammate handoff and local inference verification reconciliation
+
+### Local checks reported by the project owner
+- Robust 170-feature Logistic Regression model deserialized successfully in the primary developer's environment.
+- Fold-specific scaler checkpoint restored and finalized successfully.
+- Validation feature cache checked: 216,005 rows × 170 features.
+- Cached-feature → model → archived validation-score parity passed for 216,005 validation rows; maximum absolute probability difference approximately 2.33e-15.
+- These checks cover saved features onward only. Raw processed EEG → preprocessing → scaler → robust feature extraction → model parity remains pending.
+- These local checks have not yet been independently reproduced by a fresh teammate clone. They are not a formal model freeze or deployment verification.
+
+### Teammate-facing documentation
+- Added `docs/TEAMMATE_ONBOARDING.md` with repository/branch setup, Python 3.11 environment instructions, documentation reading order, source map, scientific safeguards, current progress and first assigned task.
+- Added `docs/ARTIFACT_TRANSFER_GUIDE.md` describing local-only artifact categories, source inventory, SHA-256 verification, transfer acceptance and receiver checks.
+- Updated README, CURRENT_STATUS, PROJECT_HANDOFF and AI_HANDOFF to point teammates to the new guides and distinguish cached-feature parity from pending raw-EEG inference parity.
+- Artifact transfer itself is not confirmed. The guide intentionally leaves bundle identity, hashes and receiver acceptance pending until a real transfer is performed.
+
+### Next milestone
+- Verify exact channel/filter/window/feature contract from source.
+- Complete raw processed-recording inference parity using an approved non-sealed development recording and already processed NPZ data.
+- Do not retrain or tune against patient_01.
+- Freeze the model only after parity passes; then implement FastAPI and connect the React dashboard.
+
+### Scope of this documentation update
+- No model training, retraining, threshold tuning or data reprocessing was performed.
+- No local test suite was run as part of this documentation update.
