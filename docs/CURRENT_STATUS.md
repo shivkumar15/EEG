@@ -3,7 +3,7 @@
 **Last reconciled:** 6 November 2026  
 **Working repository:** https://github.com/shivkumar15/EEG  
 **Active branch:** `feature/cross-patient-feature-stability-audit`  
-**Current milestone:** Research baseline handoff complete; next is model artifact/inference-readiness audit before FastAPI integration.
+**Current milestone:** Research handoff complete; saved model/scaler and cached-feature parity have been verified locally; raw processed-EEG inference parity remains pending before formal baseline freeze and FastAPI integration.
 
 > This file supersedes older status statements in this document that identify a different active branch, describe event evaluation as pending, or recommend more accuracy experiments as the immediate next step. Full experimental history is in [EXPERIMENT_HISTORY_AND_RESULTS.md](EXPERIMENT_HISTORY_AND_RESULTS.md).
 
@@ -55,6 +55,18 @@ See [Experiment History and Results](EXPERIMENT_HISTORY_AND_RESULTS.md) for exac
 - The pooled OOF threshold was selected using OOF labels; its metrics are descriptive/optimistic. Fold scores may not share calibrated scales.
 - The 170-feature robust model is **not proven superior** to the 221-feature legacy reference. It is only the provisional application candidate pending artifact/inference verification.
 
+## Local artifact verification update — 6 November 2026
+
+The following checks were completed in the primary developer's local environment and reported in the project work history. They have not yet been independently reproduced by a fresh teammate clone:
+
+- Robust 170-feature Logistic Regression model deserialized successfully.
+- Fold-specific scaler checkpoint restored and finalized successfully.
+- Validation feature cache checked: 216,005 rows × 170 features.
+- Cached-feature → model → archived validation-score parity passed for 216,005 rows; maximum absolute probability difference approximately 2.33e-15.
+- This establishes parity from the saved feature matrix onward only. **Raw processed EEG → preprocessing → scaler → feature extraction → model parity remains pending.**
+- The formal model baseline is not frozen. Do not describe the inference service as complete or deployable.
+- Local-only artifacts still require a verified transfer bundle and checksum manifest. See [Teammate Onboarding](TEAMMATE_ONBOARDING.md) and [Artifact Transfer Guide](ARTIFACT_TRANSFER_GUIDE.md).
+
 ## Current model decision
 
 Accuracy optimization is paused. Do not launch further training, feature selection, threshold tuning or alarm-policy tuning simply to improve a metric.
@@ -63,17 +75,17 @@ The robust 170-feature Logistic Regression is the provisional candidate for appl
 
 `patient_01` remains sealed. Historical first-fold test metrics are preserved as descriptive results only; never use patient_01 for future tuning, calibration, feature selection or development decisions.
 
-## Exact next milestone: model artifact/inference-readiness audit
+## Exact next milestone: raw processed-EEG inference parity
 
-Use local existing artifacts only; no training and no EDF download.
+Use existing processed artifacts only; no model training and no EDF download.
 
-1. Inspect `results/baselines`, model/checkpoint directories and relevant cache manifests.
-2. Confirm whether a deployable robust Logistic Regression model can be deserialized.
-3. Identify model scaler and feature scaler (if distinct), and exact feature/channel ordering.
-4. Confirm the exact preprocessing and inference path, including sample rate, filters, normalization, windowing and feature extraction.
-5. Run a small inference smoke test using a permitted development recording or existing saved feature data; do not use patient_01 to tune anything.
-6. Record artifact paths, checksums, package versions, input/output contract and limitations in `docs/MODEL_BASELINE_FREEZE.md`.
-7. Freeze a versioned baseline only after reproducibility is demonstrated.
+1. Obtain/verify the approved local artifact bundle using [Artifact Transfer Guide](ARTIFACT_TRANSFER_GUIDE.md).
+2. Confirm exact channel order, sample rate, filtering, normalization, windowing and robust feature ordering from source.
+3. Select an approved non-sealed development recording and run the complete processed-NPZ → scaler → feature extraction → model path.
+4. Compare generated features and probabilities with the matching reference cache/scores; record tolerances and hashes.
+5. Do not use patient_01 for tuning, threshold selection, calibration or development decisions.
+6. Only after raw-recording parity passes, write `docs/MODEL_BASELINE_FREEZE.md` with artifact hashes, package versions, input/output contract and limitations.
+7. Then implement FastAPI health/model-info/inference endpoints.
 
 ## Following milestones
 
@@ -95,7 +107,9 @@ Do not claim that the full 23-fold outer LOPO evaluation, deep learning, explain
 
 ## Read next
 
-1. [Complete Project Handoff](PROJECT_HANDOFF.md)
+1. [Teammate Onboarding](TEAMMATE_ONBOARDING.md)
+2. [Artifact Transfer Guide](ARTIFACT_TRANSFER_GUIDE.md)
+3. [Complete Project Handoff](PROJECT_HANDOFF.md)
 2. [Experiment History and Results](EXPERIMENT_HISTORY_AND_RESULTS.md)
 3. [Project Master Plan](PROJECT_MASTER_PLAN.md)
 4. [AI / Teammate Handoff](AI_HANDOFF.md)
