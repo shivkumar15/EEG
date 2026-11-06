@@ -1,6 +1,7 @@
 # AI / Teammate Handoff
 
-**Read first:** [Complete Project Handoff](PROJECT_HANDOFF.md).  
+**New teammate entry point:** [Teammate Onboarding](TEAMMATE_ONBOARDING.md), then [Artifact Transfer Guide](ARTIFACT_TRANSFER_GUIDE.md).  
+**Read first for project context:** [Complete Project Handoff](PROJECT_HANDOFF.md).  
 Then read [Current Project Status](CURRENT_STATUS.md), [Experiment History and Results](EXPERIMENT_HISTORY_AND_RESULTS.md), and [Project Master Plan](PROJECT_MASTER_PLAN.md).
 
 ## Repository and environment
@@ -33,20 +34,23 @@ Exact metrics and caveats are in `EXPERIMENT_HISTORY_AND_RESULTS.md`.
 
 The 170-feature robust Logistic Regression is the provisional integration candidate, not a proven winner. The 221-feature model remains the reference. Do not mark the baseline frozen until the saved model, scaler(s), feature order and complete preprocessing/inference contract have been verified.
 
+## Local verification update — 6 November 2026
+
+The robust model deserialized, the fold scaler checkpoint restored/finalized, and the validation cache was checked locally. Cached-feature-to-model parity passed for 216,005 validation rows (maximum absolute probability difference about 2.33e-15). This is not raw-EEG inference parity and has not been independently reproduced by a fresh teammate clone. Local-only artifact transfer must be verified using `ARTIFACT_TRANSFER_GUIDE.md`.
+
 ## Immediate task
 
-**Model artifact/inference-readiness audit — no training.**
+**Complete raw processed-recording inference parity — no training.**
 
-Inspect local `results/baselines`, `cache` and model/checkpoint directories. Verify:
-1. model file exists and deserializes;
-2. all required model scaler(s) exist;
-3. exact feature and channel order;
-4. sampling frequency, filtering, normalization, window length/stride and feature extraction;
-5. inference function uses exactly the training transformations;
-6. threshold and event policy provenance;
-7. a smoke test works on permitted development data or saved features.
+Obtain the approved artifact bundle and inspect local `results/baselines`, `cache` and model/checkpoint directories. Verify:
+1. bundle hashes and checkpoint manifests;
+2. exact feature and channel order;
+3. sampling frequency, filtering, normalization, window length/stride and feature extraction;
+4. inference function uses exactly the training transformations;
+5. threshold and event policy provenance;
+6. full processed-NPZ → scaler → feature extraction → model parity on an approved non-sealed development recording.
 
-Write `docs/MODEL_BASELINE_FREEZE.md` with artifact paths, hashes, package versions, input/output contract, reproducibility evidence and limitations. If no deployable checkpoint exists, inspect completed training checkpoints and determine a safe export path. Do not automatically retrain.
+Only after raw-recording parity passes, write `docs/MODEL_BASELINE_FREEZE.md` with artifact paths, hashes, package versions, input/output contract, reproducibility evidence and limitations. If an artifact is missing, inspect completed checkpoints and determine a safe export path. Do not automatically retrain.
 
 Do not use patient_01 for tuning, calibration, feature selection or development. Existing historical outer-test results may be retained as descriptive metrics only.
 
