@@ -52,6 +52,7 @@ class SavedWindowsIntegrationTests(unittest.TestCase):
                 np.testing.assert_array_equal(labels, [0, 1, 1, 0, 0])
                 self.assertEqual(len(saved["channels"]), len(PREFERRED_CHANNELS))
                 self.assertEqual(float(saved["sfreq"]), 1.0)
+                self.assertEqual(float(saved["recording_duration_seconds"]), 30.0)
                 self.assertEqual(str(saved["subject"]), "chb01")
                 self.assertEqual(str(saved["source_file"]), "chb01_03.edf")
                 self.assertEqual(str(saved["normalization"]), "none_fold_train_only_scaling_required")
@@ -60,6 +61,7 @@ class SavedWindowsIntegrationTests(unittest.TestCase):
             self.assertTrue(metadata_path.exists())
             metadata = pd.read_csv(metadata_path)
             self.assertEqual(len(metadata), len(starts))
+            self.assertTrue((metadata["recording_duration_seconds"] == 30.0).all())
             np.testing.assert_array_equal(metadata["window_start_seconds"], starts)
             np.testing.assert_array_equal(
                 metadata["window_end_seconds"], starts + main.WINDOW_SECONDS

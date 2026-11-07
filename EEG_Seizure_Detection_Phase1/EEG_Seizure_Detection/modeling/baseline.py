@@ -17,7 +17,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
-    average_precision_score, confusion_matrix, f1_score, precision_score,
+    average_precision_score, confusion_matrix, f1_score, fbeta_score, precision_score,
     precision_recall_curve, recall_score, roc_auc_score,
 )
 from sklearn.pipeline import Pipeline
@@ -293,35 +293,42 @@ def positive_scores(estimator, X: np.ndarray) -> np.ndarray:
     return scores
 
 
-def choose_f1_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:
-    """Choose an F1-maximizing threshold efficiently using validation labels only.
+def choose_fbeta_threshold(
+    y_true: np.ndarray, scores: np.ndarray, beta: float = 1.0,
+) -> float:
+    """Choose an F-beta-maximizing threshold using validation labels only.
 
-    precision_recall_curve computes all threshold operating points in one
-    pass over the scores. The previous implementation called f1_score once
-    per unique score, repeatedly scanning the full validation set.
+    beta=1 is F1; beta=2 weights recall more heavily. This function must only
+    receive inner-validation labels/scores, never outer-test labels.
     """
     y = np.asarray(y_true, dtype=np.int8)
     values = np.asarray(scores, dtype=np.float64)
+    if not np.isfinite(beta) or beta <= 0:
+        raise ValueError("beta must be a finite positive number")
     if y.ndim != 1 or values.shape != y.shape or not np.isin(y, (0, 1)).all():
         raise ValueError("Expected aligned one-dimensional binary labels and scores")
     if not np.isfinite(values).all() or not np.any(y == 1):
         raise ValueError("Threshold selection requires finite scores and positive labels")
 
     precision, recall, thresholds = precision_recall_curve(y, values)
-    # The final precision/recall pair has no corresponding threshold.
     precision = precision[:-1]
     recall = recall[:-1]
-    denominator = precision + recall
-    f1_values = np.divide(
-        2.0 * precision * recall,
+    beta_squared = float(beta) ** 2
+    denominator = beta_squared * precision + recall
+    fbeta_values = np.divide(
+        (1.0 + beta_squared) * precision * recall,
         denominator,
         out=np.zeros_like(denominator),
         where=denominator > 0,
     )
-    # thresholds are ascending; argmax therefore preserves the previous
-    # implementation's smallest-threshold tie-breaking behavior.
-    best_index = int(np.argmax(f1_values))
+    # thresholds are ascending; argmax preserves smallest-threshold tie breaking.
+    best_index = int(np.argmax(fbeta_values))
     return float(thresholds[best_index])
+
+
+def choose_f1_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:
+    """Backward-compatible F1 threshold selector."""
+    return choose_fbeta_threshold(y_true, scores, beta=1.0)
 
 
 def calculate_metrics(y_true: np.ndarray, scores: np.ndarray, threshold: float) -> dict:
@@ -342,6 +349,7 @@ def calculate_metrics(y_true: np.ndarray, scores: np.ndarray, threshold: float) 
         "specificity": specificity,
         "precision": float(precision_score(y, predicted, zero_division=0)),
         "f1": float(f1_score(y, predicted, zero_division=0)),
+        "f2": float(fbeta_score(y, predicted, beta=2.0, zero_division=0)),
         "auroc": float(roc_auc_score(y, values)) if len(np.unique(y)) == 2 else None,
         "auprc": float(average_precision_score(y, values)) if np.any(y == 1) else None,
         "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp),

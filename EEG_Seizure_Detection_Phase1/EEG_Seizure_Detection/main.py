@@ -46,6 +46,7 @@ def process_edf(edf_path: str | Path):
     raw.pick(channels)
     sfreq = float(raw.info["sfreq"])
     data = raw.get_data()
+    recording_duration_seconds = float(data.shape[-1] / sfreq)
     intervals = read_seizure_intervals(edf_path)
     print(f"Channels selected: {len(channels)}")
     print(f"Sampling frequency: {sfreq:g} Hz")
@@ -64,12 +65,15 @@ def process_edf(edf_path: str | Path):
     np.savez_compressed(
         npz_path, X=X, y=y, starts=starts, channels=np.asarray(channels),
         sfreq=sfreq, subject=subject, source_file=edf_path.name,
+        recording_duration_seconds=recording_duration_seconds,
         normalization=NORMALIZATION_POLICY,
     )
     metadata = pd.DataFrame({
         "subject": subject, "source_file": edf_path.name,
         "window_start_seconds": starts, "window_end_seconds": starts + WINDOW_SECONDS,
-        "sampling_frequency_hz": sfreq, "channels": "|".join(channels),
+        "sampling_frequency_hz": sfreq,
+        "recording_duration_seconds": recording_duration_seconds,
+        "channels": "|".join(channels),
         "normalization": NORMALIZATION_POLICY, "label": y,
     })
     metadata.to_csv(PROCESSED_DIR / f"{output_name}_metadata.csv", index=False)
@@ -92,6 +96,12 @@ def _metadata_is_consistent(recording, metadata_path: Path, windows) -> bool:
             return False
         if not np.array_equal(metadata["label"].to_numpy(), windows.y):
             return False
+        if "recording_duration_seconds" in metadata.columns:
+            durations = metadata["recording_duration_seconds"].to_numpy(dtype=float)
+            if not np.isfinite(durations).all() or not np.allclose(
+                durations, durations[0], rtol=0.0, atol=1e-9
+            ):
+                return False
         return bool((metadata["normalization"] == NORMALIZATION_POLICY).all())
     except Exception:
         return False

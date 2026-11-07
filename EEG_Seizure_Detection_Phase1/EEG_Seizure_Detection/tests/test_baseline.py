@@ -10,7 +10,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from modeling.baseline import (
-    FeatureBatch, calculate_metrics, choose_f1_threshold,
+    FeatureBatch, calculate_metrics, choose_f1_threshold, choose_fbeta_threshold,
     fit_validate_model, positive_scores, build_baseline_estimators,
     collect_features,
 )
@@ -27,6 +27,26 @@ class BaselineUtilityTests(unittest.TestCase):
         scores = np.array([-2.0, -1.0, 1.0, 2.0])
         threshold = choose_f1_threshold(y, scores)
         self.assertEqual(calculate_metrics(y, scores, threshold)["f1"], 1.0)
+
+    def test_f2_threshold_matches_brute_force_and_prioritizes_recall(self):
+        y = np.array([0, 0, 0, 1, 1, 1], dtype=np.int8)
+        scores = np.array([0.1, 0.2, 0.4, 0.3, 0.5, 0.9])
+        threshold = choose_fbeta_threshold(y, scores, beta=2.0)
+        from sklearn.metrics import fbeta_score
+        candidates = np.unique(scores)
+        expected = max(
+            candidates,
+            key=lambda value: fbeta_score(y, scores >= value, beta=2.0, zero_division=0),
+        )
+        self.assertEqual(threshold, float(expected))
+        self.assertEqual(choose_f1_threshold(y, scores), choose_fbeta_threshold(y, scores, beta=1.0))
+
+    def test_fbeta_rejects_invalid_beta(self):
+        y = np.array([0, 1], dtype=np.int8)
+        scores = np.array([0.1, 0.9])
+        for beta in (0, -1, float("nan"), float("inf")):
+            with self.assertRaises(ValueError):
+                choose_fbeta_threshold(y, scores, beta=beta)
 
     def test_threshold_matches_brute_force_for_repeated_scores(self):
         y = np.array([0, 1, 0, 1, 0, 1, 0, 0, 1], dtype=np.int8)
@@ -57,6 +77,7 @@ class BaselineUtilityTests(unittest.TestCase):
         result = calculate_metrics(y, scores, 0.5)
         self.assertEqual((result["tn"], result["fp"], result["fn"], result["tp"]), (2, 1, 0, 2))
         self.assertEqual(result["sensitivity"], 1.0)
+        self.assertIn("f2", result)
         self.assertEqual(result["specificity"], 2 / 3)
         self.assertIsNotNone(result["auprc"])
         self.assertIsNotNone(result["auroc"])
