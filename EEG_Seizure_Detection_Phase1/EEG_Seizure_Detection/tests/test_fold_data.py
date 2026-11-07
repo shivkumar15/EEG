@@ -1,5 +1,7 @@
+import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -82,6 +84,41 @@ class FoldDataTests(unittest.TestCase):
             np.testing.assert_array_equal(result.y, test_items[0].y)
             np.testing.assert_array_equal(result.starts, test_items[0].starts)
             self.assertEqual(result.recording, outer_test)
+
+    def test_fold_scaler_checkpoint_is_reused_without_reloading_recordings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            train = [make_recording(n, seizures=(1 if n == 1 else 0))
+                     for n in range(1, 7)]
+            for item in train:
+                save_recording(directory, item, float(int(item.subject[-2:]) * 10))
+            outer_test = make_recording(7, seizures=1)
+            save_recording(directory, outer_test, 10000.0)
+            fold = LopoFold(7, outer_test.patient_id, tuple(train), (outer_test,))
+            checkpoint = __import__("pathlib").Path(directory) / "scaler_checkpoint"
+
+            first = prepare_lopo_fold(
+                fold, directory, validation_fraction=0.33, random_state=3,
+                scaler_checkpoint_dir=checkpoint,
+            )
+            manifest_before = json.loads((checkpoint / "manifest.json").read_text())
+            self.assertTrue(manifest_before["complete"])
+            self.assertEqual(manifest_before["completed_recordings"], len(first.fit_recordings))
+
+            with patch(
+                "data_management.fold_data.load_recording_windows",
+                side_effect=AssertionError("completed scaler checkpoint should be reused"),
+            ):
+                second = prepare_lopo_fold(
+                    fold, directory, validation_fraction=0.33, random_state=3,
+                    scaler_checkpoint_dir=checkpoint,
+                )
+
+            np.testing.assert_array_equal(
+                second.standardizer.mean_, first.standardizer.mean_
+            )
+            np.testing.assert_array_equal(
+                second.standardizer.scale_, first.standardizer.scale_
+            )
 
     def test_feature_iteration_supports_each_split(self):
         with tempfile.TemporaryDirectory() as directory:

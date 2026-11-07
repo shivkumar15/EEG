@@ -27,7 +27,9 @@ from data_management.fold_data import load_recording_windows
 from config import PREFERRED_CHANNELS
 from data_management.patient_mapping import Recording
 from feature_selection.feature_extraction import FEATURE_NAMES, extract_features
-from preprocessing.normalization import FoldChannelStandardizer
+from preprocessing.normalization import (
+    FoldChannelStandardizer, scaler_checkpoint_signature,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,22 +41,43 @@ class FeatureBatch:
 
 def fit_channel_standardizer(
     recordings: Sequence[Recording], processed_dir,
+    checkpoint_dir: Path | None = None,
+    checkpoint_context: dict | None = None,
 ) -> FoldChannelStandardizer:
-    """Fit channel statistics on exactly the supplied recordings, streamed."""
+    """Fit channel statistics on exactly the supplied recordings, streamed.
+
+    When checkpoint_dir is provided, the running Welford accumulator is saved
+    atomically after every complete recording and resumed only for an exact
+    recording/source/context signature.
+    """
     scaler = FoldChannelStandardizer()
 
-    def batches():
-        for index, recording in enumerate(recordings, start=1):
+    def batches(start_index=0):
+        for index, recording in enumerate(recordings[start_index:], start=start_index + 1):
             item = load_recording_windows(processed_dir, recording)
             yield item.X
             del item
-            if index % 25 == 0 or index == len(recordings):
+            if checkpoint_dir is None and (index % 25 == 0 or index == len(recordings)):
                 print(
                     f"    channel-scaler fit: {index}/{len(recordings)} recordings",
                     flush=True,
                 )
 
-    return scaler.fit_batches(batches())
+    if checkpoint_dir is None:
+        return scaler.fit_batches(batches())
+
+    if checkpoint_context is None:
+        raise ValueError("checkpoint_context is required when checkpointing a scaler")
+    signature = scaler_checkpoint_signature(
+        recordings, processed_dir, checkpoint_context, scaler.epsilon
+    )
+    return scaler.fit_batches_checkpointed(
+        batches,
+        total_batches=len(recordings),
+        checkpoint_dir=checkpoint_dir,
+        signature=signature,
+        progress_label="outer-training channel-scaler fit",
+    )
 
 
 def _feature_cache_signature(recordings, channel_scaler, processed_paths) -> str:
