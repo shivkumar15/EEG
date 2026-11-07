@@ -1,78 +1,106 @@
-# Current Project Status — 3 November 2026
+# Current Project Status — 4 November 2026
 
-Active repository: https://github.com/shivkumar15/EEG
+**Active repository:** https://github.com/shivkumar15/EEG  
+**Active branch:** `feature/model-stage-checkpoints`  
+**Current milestone:** Phase 4.5.2 — model-stage checkpoint verification.
 
-## Completed and verified
-- Full CHB-MIT audit: 686 EDF recordings, 198 seizure events, 24 subject folders; no annotation parsing failures.
+## Project objective
+
+Academic binary seizure detection from EEG windows using the CHB-MIT dataset. The task is seizure detection, not prediction of future seizures. This is not a medical device and must not be used for diagnosis or treatment decisions.
+
+## Verified research dataset
+
+- Full audit: 686 EDF recordings, 198 seizure events, 24 subject folders; zero annotation parse failures.
 - Primary cohort: 683 recordings, 185 seizure events, 23 independent patients.
-- Three CHB12 recordings excluded for incompatible montage; CHB01 and CHB21 grouped as one person.
-- Full preprocessing integrity: 683/683 recordings valid; 704,836 windows (702,280 normal; 2,556 seizure).
-- Patient-wise evaluation: 23 LOPO folds; every eligible recording tested once; patient leakage checks passed.
-- Nested validation: 17 fit patients, 5 validation patients, 1 outer test patient per fold.
-- Fold-wise standardization is fitted on inner-fit patients only.
-- Feature extraction implements 13 features per channel, with synthetic validation:
-  - Pure-tone validation: 5/5 passed.
-  - Boundary-frequency diagnostic: 10 frequencies produced sensible dominant-band results.
-  - Mixed 2 Hz + 10 Hz signal: PASS.
-  - Noisy 10 Hz alpha signal: PASS; finite band powers and alpha remained dominant.
-- Fold-wise feature integration is implemented in `data_management/fold_data.py`:
-  - `PreparedFold.iter_features("fit"|"validation"|"test")` applies the already-fitted fold standardizer and then extracts features one recording at a time.
-  - Each 10-second window from the fixed 17-channel montage produces 221 float32 features (17 × 13).
-  - Labels, window start timestamps, sampling frequency and recording identity are returned alongside each feature matrix.
-  - Feature extraction is deterministic and does not fit on validation or outer-test data.
-- User-reported local verification after pulling commits `5100a3c` and `372afa0`:
-  - Focused fold-data integration suite: **5 tests passed, 0 failures** in 0.521 seconds.
-  - Full regression suite: **98 tests passed, 0 failures** in 0.874 seconds.
+- CHB01 and CHB21 are grouped as the same individual (`patient_01`).
+- Three CHB12 recordings are excluded from the primary cohort because of incompatible montage.
+- All 686 headers were inspected; all use 256 Hz.
+- Preferred 17-channel montage is present in 683/686 recordings.
 
-## Phase 4 — feature integration: IMPLEMENTED AND LOCALLY VERIFIED
-Feature extraction implements 13 features per channel: mean, standard deviation, variance, RMS, line length, skewness, excess kurtosis, five EEG band powers, and spectral entropy.
+## Verified preprocessing and split design
 
-The revised spectral calculation:
-- Uses up to 2-second Welch segments (512 samples at 256 Hz; 0.5 Hz bin spacing).
-- Integrates band power between exact configured band edges using interpolated PSD values.
-- Has synthetic expected-power regression tests: 2 Hz unit-amplitude sine gives approximately 0.5 delta power; 10 Hz amplitude-0.5 sine gives approximately 0.125 alpha power.
+- Full primary-cohort integrity audit: 683/683 recordings valid.
+- 704,836 windows: 702,280 normal and 2,556 seizure.
+- Window length 10 seconds; stride 5 seconds.
+- 23 outer LOPO folds; every eligible recording tested exactly once; no patient leakage in split inspection.
+- Nested split: 17 fit patients, 5 validation patients, 1 outer-test patient.
+- Fold-wise standardization is fitted on inner-fit patients only and applied to validation/test.
+- These audits verify data and split integrity, not model performance.
 
-**Interpretation:** These results verify implementation behavior on the tested synthetic signals and software integration. They do not establish performance on real EEG or seizure detection accuracy.
+## Verified feature pipeline
 
-## Synthetic validation records
-- Pure-tone script: `scripts/validate_frequency_features.py`.
-- Extended robustness script: `scripts/validate_frequency_robustness.py`.
-- Tested boundary-near frequencies: 0.75, 3.5, 4.5, 7.5, 8.5, 12.5, 13.5, 29.5, 30.5 and 39.5 Hz.
-- Mixed signal: 2 Hz plus 10 Hz.
-- Noisy signal: 10 Hz plus Gaussian noise (standard deviation 0.3, seed 42).
-- Synthetic tests do not replace validation on actual CHB-MIT EEG.
+- 13 features per channel and 17 channels = 221 features per window.
+- Features include time-domain statistics, five frequency-band powers and spectral entropy.
+- Welch uses up to 2-second segments; band power integrates between configured edges using interpolated PSD values.
+- Synthetic validation covers five pure tones, ten boundary-near frequencies, a mixed 2 Hz + 10 Hz signal and a noisy 10 Hz signal.
+- `PreparedFold.iter_features("fit"|"validation"|"test")` streams one recording at a time and returns features with labels, timestamps, sampling frequency and recording identity.
+- Synthetic validation and software tests do not establish real-EEG model performance.
+- Fold-standardized band powers are not calibrated physical microvolt-squared power.
 
-## Next steps
-1. Review/freeze feature definitions and spectral entropy interpretation.
-2. Build the baseline training/evaluation workflow using the fold-wise feature iterator.
-3. Train SVM and Random Forest baselines using nested patient-wise splits.
-4. Record out-of-fold predictions and evaluate window-level and event-level metrics separately.
+## Phase 4 — baseline model development
 
-## Not started
-- Classical baseline model training and final metrics.
-- 1D CNN, CNN-BiLSTM and attention model experiments.
+### Implemented
+- Feature extraction and fold-wise feature integration.
+- Logistic Regression and Random Forest baseline pipelines/utilities.
+- Validation-only F1 threshold selection and metric calculation.
+- First-fold preflight and first-fold runner.
+- Per-recording feature cache and fold-specific scaler checkpoints.
+- Model-stage checkpoint store and integration on the current branch.
+
+### Current checkpoint implementation (4.5.2)
+The current branch contains model-stage persistence for:
+1. Completed inner Logistic Regression fit.
+2. Inner validation scores.
+3. Validation-selected threshold and metrics.
+4. Completed final outer-training model fit.
+5. Outer-test scores.
+6. Completed first-fold JSON result.
+
+Reuse is guarded by experiment signatures and artifact SHA-256 integrity. Cached labels are compared with current split labels.
+
+**Known limitation:** an interrupted `LogisticRegression(solver="liblinear")` fit must restart from the beginning; the solver does not provide a supported mid-fit continuation mechanism. Checkpoints preserve completed stages, not an in-progress solver state.
+
+**Verification state:** implementation is present on `feature/model-stage-checkpoints`. User is correcting local environment/path setup. Current compile, focused checkpoint tests, full regression suite and controlled runner interruption/restart have not yet been confirmed in this status record. Do not assume a test count or start an expensive full-data experiment until outputs are reviewed.
+
+## Immediate next actions
+
+1. Verify the correct Python 3.11 environment (`.venv311`) from repository root.
+2. Run compile and focused `test_experiment_checkpoints.py` tests from the nested project code directory.
+3. Run the full unit test suite from that same directory.
+4. Review actual outputs and fix any failures before further work.
+5. Add/run controlled interruption and restart tests for the first-fold runner.
+6. Only after those checks, implement the complete 23-fold runner with per-fold result checkpoints and atomic aggregation.
+
+## Not yet completed
+
+- Complete 23-fold baseline runner and aggregated results.
+- Real-EEG baseline metrics across all outer patients.
+- 1D CNN, CNN-BiLSTM and CNN-BiLSTM-attention experiments.
+- Final window-level and event-level evaluation.
 - Explainability.
 - FastAPI inference integration.
-- React dashboard integration with a trained model.
+- React dashboard integration with validated model output.
+- Final reproducibility and submission package.
 
-## React frontend
-A separate foundation branch exists: `feature/react-dashboard-foundation`, commit `2a08eb9a921db5d84e953510539b6ecdc5e5733d`, with open PR #1: https://github.com/shivkumar15/EEG/pull/1. It contains illustrative mock data only; the local frontend build is not yet verified and the PR is not merged.
+## React dashboard status
+
+Separate branch: `feature/react-dashboard-foundation`. Open PR #1: https://github.com/shivkumar15/EEG/pull/1. It contains illustrative mock data only. It is not merged, the local build has not been confirmed here, and it is not connected to a trained model or inference API.
 
 ## Research safeguards
-No random window-level train/test split. Fit all preprocessing, feature selection, thresholds and hyperparameters using training/validation patients only. Report window-level and event-level results separately. Fold-standardized band powers must not be described as calibrated physical microvolt-squared power. This is an academic research prototype, not a medical device.
 
+- Never randomly split overlapping windows across train/test.
+- Never fit scalers, feature selectors, thresholds or hyperparameters on outer-test patients.
+- Keep all model comparisons on identical patient-wise splits.
+- Report window-level and event-level results separately.
+- Define event matching and alarm rules before reporting false alarms per hour.
+- Preserve dataset provenance and do not commit raw EDFs or runtime caches.
 
-## 3 November 2026 — Baseline utility milestone 4.3
+## Relevant documentation
 
-- Baseline utilities are implemented on GitHub main in EEG_Seizure_Detection_Phase1/EEG_Seizure_Detection/modeling/baseline.py.
-- Added feature collection with recording-at-a-time extraction, training-only channel standardizer fitting, Logistic Regression and Random Forest pipelines, positive-class scoring, validation-only F1 threshold selection, and window-level metrics.
-- Added tests in tests/test_baseline.py.
-- User-reported local verification: focused baseline tests 5/5 passed; complete regression suite 103/103 passed, 0 failures, in 0.446 seconds.
-- These tests verify software utilities only. No real-EEG baseline training or seizure-detection performance metrics have been produced.
-- Next: implement a controlled first-LOPO-fold runner, inspect class counts and memory, and settle the threshold/refit protocol before any outer-test evaluation. Reusing a threshold after refitting a model can change score calibration; this must not be assumed valid.
-
-
-## First baseline fold preflight
-- Added `scripts/inspect_first_baseline_fold.py` (commit `50448b10aa324d2d0b2f4d2bf0d3b34ab06799ec`).
-- The script loads the audited primary cohort, constructs the first outer LOPO fold and deterministic inner patient split, counts normal/seizure windows per split, and estimates float32 feature-matrix memory at 221 columns.
-- It does not extract features, fit models, or evaluate outer-test performance. Run it from the EEG_Seizure_Detection project directory with `python .\\scripts\\inspect_first_baseline_fold.py`.
+- [Project Master Plan](PROJECT_MASTER_PLAN.md)
+- [AI / Teammate Handoff](AI_HANDOFF.md)
+- [Development Log](DEVELOPMENT_LOG.md)
+- [Training Checkpoint Policy](ML_TRAINING_CHECKPOINT_POLICY.md)
+- [Scaler Checkpoints](SCALER_CHECKPOINTS.md)
+- [Model-Stage Checkpoints](MODEL_STAGE_CHECKPOINTS.md)
+- [Upstream Change Log](CHANGELOG_FOR_UPSTREAM.md)

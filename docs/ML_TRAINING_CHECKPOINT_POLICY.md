@@ -32,11 +32,13 @@ For every future training pipeline, assess and checkpoint the following expensiv
 
 The first-fold runner supports per-recording feature extraction checkpoints through disk-backed NumPy arrays and an atomic manifest. Completed feature recordings can be reused after interruption when the cache signature matches.
 
-Fold-specific channel-scaler fitting now supports per-recording checkpoints of the running sample count, channel mean and M2 accumulator. The scaler checkpoint signature binds the exact ordered recordings, patient/fold context, processed NPZ source fingerprints, algorithm version and epsilon. The manifest advances only after a complete recording's accumulator state has been flushed and atomically stored. Inner-fit and outer-training scaler contexts use separate checkpoint directories.
+Fold-specific channel-scaler fitting supports per-recording checkpoints of the running sample count, channel mean and M2 accumulator. The scaler checkpoint signature binds the exact ordered recordings, patient/fold context, processed NPZ source fingerprints, algorithm version and epsilon. Inner-fit and outer-training scaler contexts use separate checkpoint directories.
 
-**Important limitations:** estimator fitting itself is not checkpointed. If interrupted during Logistic Regression or Random Forest fitting, that fit must currently be repeated; compatible scaler and feature caches remain reusable. Validation scoring/threshold selection and final test scoring are not independently checkpointed. The runner currently handles the first LOPO fold only; it is not yet a resumable 23-fold experiment runner. See `docs/SCALER_CHECKPOINTS.md` for the scaler checkpoint format and validation coverage.
+The model-stage checkpoint store now persists completed inner and final Logistic Regression estimators, validation and outer-test score arrays, the validation-selected threshold/metrics, and the completed first-fold JSON result. Reuse requires a matching experiment signature and artifact SHA-256 manifest. Cached validation/test labels are compared with the current split.
 
-Do not claim full end-to-end resume until model-fitting recovery and fold-level recovery have been implemented and tested.
+**Important estimator limitation:** an interrupted `LogisticRegression(solver="liblinear")` fit must restart from the beginning; only a fit that returned successfully can be saved and reused. This is not mid-solver recovery. The first-fold runner is still not a resumable 23-fold experiment runner: fold-level scheduling, durable per-fold result skipping across all 23 patients, and aggregation are not yet implemented or interruption-tested. See `docs/SCALER_CHECKPOINTS.md` and `docs/MODEL_STAGE_CHECKPOINTS.md`.
+
+Do not claim full end-to-end resume until the complete 23-fold workflow and aggregation have been implemented and tested.
 
 ## Definition of done for a resumable experiment
 
